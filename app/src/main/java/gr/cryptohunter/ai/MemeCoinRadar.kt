@@ -22,7 +22,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private data class MemeCandidate(
+internal data class MemeCandidate(
     val name: String,
     val symbol: String,
     val chain: String,
@@ -37,7 +37,7 @@ private data class MemeCandidate(
     val transactions: Int
 )
 
-private data class MemeScan(val coins: List<MemeCandidate>, val checkedAt: String, val sources: Int)
+internal data class MemeScan(val coins: List<MemeCandidate>, val checkedAt: String, val sources: Int)
 
 private fun memeHttp(url: String): String {
     val c = URL(url).openConnection() as HttpURLConnection
@@ -47,7 +47,7 @@ private fun memeHttp(url: String): String {
     return try { c.inputStream.bufferedReader().use { it.readText() } } finally { c.disconnect() }
 }
 
-private suspend fun scanMemeCoins(): MemeScan = withContext(Dispatchers.IO) {
+internal suspend fun scanMemeCoins(): MemeScan = withContext(Dispatchers.IO) {
     val sources = mutableListOf<Pair<String, String>>()
     runCatching {
         val arr = JSONArray(memeHttp("https://api.dexscreener.com/token-profiles/latest/v1"))
@@ -106,7 +106,7 @@ private suspend fun scanMemeCoins(): MemeScan = withContext(Dispatchers.IO) {
     MemeScan(ranked, SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date()), unique.size)
 }
 
-private fun usdShort(value: Double): String = when {
+internal fun usdShort(value: Double): String = when {
     value >= 1_000_000 -> "\\$" + String.format(Locale.US, "%.2fM", value / 1_000_000)
     value >= 1_000 -> "\\$" + String.format(Locale.US, "%.1fK", value / 1_000)
     else -> "\\$" + String.format(Locale.US, "%.0f", value)
