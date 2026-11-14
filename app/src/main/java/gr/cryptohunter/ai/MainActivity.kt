@@ -190,7 +190,7 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
             Text("Spot  •  Futures  •  Multi-exchange", color = Muted, fontSize = 13.sp)
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Επισκόπηση", "Σήματα", "Ρυθμίσεις").forEach { item ->
+                listOf("Επισκόπηση", "Σήματα", "Radar", "Ρυθμίσεις").forEach { item ->
                     GlassChip(label = item, selected = tab == item) { tab = item }
                 }
             }
@@ -236,6 +236,9 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
                             Text("Τα σήματα θα εμφανιστούν μόλις ολοκληρωθεί επιτυχώς η ανάλυση δεδομένων.", color = Muted, fontSize = 11.sp)
                         }
                     }
+                }
+                "Radar" -> {
+                    DiscoveryRadarScreen()
                 }
                 "Σήματα" -> {
                     SectionTitle("Τεχνικά σήματα", "TOP 50 • BINANCE • 1H • ΑΝΑΝΕΩΣΗ ΑΝΑ 5 ΛΕΠΤΑ")
