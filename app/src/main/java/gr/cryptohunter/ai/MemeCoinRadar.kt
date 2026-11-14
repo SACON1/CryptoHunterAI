@@ -154,6 +154,7 @@ fun MemeCoinRadarScreen() {
             if (flags.isEmpty()) Text("Δεν εντοπίστηκαν τα παραπάνω βασικά red flags στα διαθέσιμα δεδομένα. Αυτό ΔΕΝ αποδεικνύει ότι είναι ασφαλές.", color = Color(0xFFFFC857), fontSize = 12.sp)
             else flags.forEach { Text("⚠ $it", color = Color(0xFFFFC857), fontSize = 12.sp) }
             Text("Δεν ελέγχθηκαν ακόμη owner privileges, mint/freeze authority, holder concentration, developer history ή honeypot με ανεξάρτητο on-chain scanner.", color = Color(0xFFA7B4D0), fontSize = 11.sp)
+            RugPullCheckCard(coin.chain, coin.address)
             if (coin.url.startsWith("https://")) {
                 Button(onClick = { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(coin.url))) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B75FF))) {
                     Text("Άνοιγμα DexScreener", color = Color.White)
