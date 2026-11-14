@@ -191,7 +191,7 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
             Text("Spot  •  Futures  •  Multi-exchange", color = Muted, fontSize = 13.sp)
             Spacer(Modifier.height(20.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Επισκόπηση", "Σήματα", "Meme Coins", "Agent", "Ρυθμίσεις").forEach { item ->
+                listOf("Επισκόπηση", "Σήματα", "Meme Coins", "Rug Pull", "Agent", "Ρυθμίσεις").forEach { item ->
                     GlassChip(label = item, selected = tab == item) { tab = item }
                 }
             }
