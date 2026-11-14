@@ -135,7 +135,7 @@ fun MemeCoinRadarScreen() {
             TextButton(onClick = { selected = null }) { Text("← Πίσω στη λίστα", color = Color(0xFF45D9FF)) }
             Text(coin.name, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
             Text("${coin.symbol} • ${coin.chain}", color = Color(0xFF45D9FF), fontWeight = FontWeight.Bold)
-            Text("Τιμή: \\${coin.price}", color = Color.White)
+            Text("Τιμή: ${coin.price}", color = Color.White)
             Text("Liquidity: ${usdShort(coin.liquidity)}", color = Color.White)
             Text("Όγκος 24h: ${usdShort(coin.volume24h)}", color = Color.White)
             Text("Μεταβολή 24h: ${String.format(Locale.US, "%.2f", coin.change24h)}%", color = if (coin.change24h >= 0) Color(0xFF42E6B0) else Color(0xFFFF7185))
