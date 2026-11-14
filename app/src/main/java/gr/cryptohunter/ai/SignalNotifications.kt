@@ -2,6 +2,8 @@ package gr.cryptohunter.ai
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -85,8 +87,20 @@ object SignalNotifications {
                     }
                 }
 
+                val openCoinIntent = Intent(context, MainActivity::class.java).apply {
+                    putExtra(MainActivity.EXTRA_SIGNAL_SYMBOL, signal.symbol)
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                val contentIntent = PendingIntent.getActivity(
+                    context,
+                    signal.symbol.hashCode(),
+                    openCoinIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
                 val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentIntent(contentIntent)
                     .setContentTitle("Crypto Hunter AI • ${signal.symbol} ${signal.direction}")
                     .setContentText(details)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(
