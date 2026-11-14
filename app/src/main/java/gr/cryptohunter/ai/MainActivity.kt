@@ -20,6 +20,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
@@ -189,8 +190,8 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
             Spacer(Modifier.height(6.dp))
             Text("Spot  •  Futures  •  Multi-exchange", color = Muted, fontSize = 13.sp)
             Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Επισκόπηση", "Σήματα", "Agent", "Ρυθμίσεις").forEach { item ->
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("Επισκόπηση", "Σήματα", "Meme Coins", "Agent", "Ρυθμίσεις").forEach { item ->
                     GlassChip(label = item, selected = tab == item) { tab = item }
                 }
             }
@@ -236,6 +237,9 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
                             Text("Τα σήματα θα εμφανιστούν μόλις ολοκληρωθεί επιτυχώς η ανάλυση δεδομένων.", color = Muted, fontSize = 11.sp)
                         }
                     }
+                }
+                "Meme Coins" -> {
+                    MemeCoinRadarScreen()
                 }
                 "Agent" -> {
                     AgentResearchScreen()
