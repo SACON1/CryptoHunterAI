@@ -9,6 +9,11 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
@@ -83,6 +88,8 @@ fun CryptoHunterApp() {
     var scanStatus by remember { mutableStateOf("Η τεχνική ανάλυση δεν έχει ξεκινήσει.") }
     var notificationsEnabled by remember { mutableStateOf(SignalNotifications.areNotificationsEnabled(context)) }
     LaunchedEffect(tab) { notificationsEnabled = SignalNotifications.areNotificationsEnabled(context) }
+    val pulse = rememberInfiniteTransition(label = "live-pulse")
+    val liveAlpha by pulse.animateFloat(0.45f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "live-alpha")
 
     LaunchedEffect(Unit) {
         SignalNotifications.createChannel(context)
@@ -133,7 +140,7 @@ fun CryptoHunterApp() {
                 }
                 Text(
                     if (connection.startsWith("Επιτυχής")) "● LIVE" else "● OFFLINE",
-                    color = if (connection.startsWith("Επιτυχής")) Green else Color(0xFFFFC857),
+                    color = (if (connection.startsWith("Επιτυχής")) Green else Color(0xFFFFC857)).copy(alpha = liveAlpha),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 )
