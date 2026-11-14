@@ -93,7 +93,22 @@ object TechnicalAnalysis {
         val riskReward = if (stopLoss != null && takeProfit != null) {
             abs(takeProfit - last) / abs(last - stopLoss).coerceAtLeast(1e-12)
         } else null
-        val explanation = "EMA20 ${fmt(ema20)} • EMA50 ${fmt(ema50)} • RSI ${fmt(rsi)} • MACD ${if (macdLine > macdSignal) "θετικό" else "αρνητικό"} • Όγκος ${fmt(volumeRatio)}x"
+        val buyMissing = buildList {
+            if (score < 75) add("score κάτω από 75")
+            if (trend < 65) add("τάση EMA μη επιβεβαιωμένη")
+            if (macdScore < 65) add("MACD χωρίς ανοδική επιβεβαίωση")
+        }
+        val sellMissing = buildList {
+            if (score > 30) add("score πάνω από 30")
+            if (trend > 35) add("τάση EMA δεν είναι καθοδική")
+            if (macdScore > 35) add("MACD δεν επιβεβαιώνει πτώση")
+        }
+        val decisionNote = when (direction) {
+            "BUY" -> "BUY: επιβεβαιώθηκαν score, EMA και MACD"
+            "SELL" -> "SELL: επιβεβαιώθηκαν score, EMA και MACD"
+            else -> "WAIT • Για BUY: ${buyMissing.joinToString(", ")} • Για SELL: ${sellMissing.joinToString(", ")}"
+        }
+        val explanation = "$decisionNote\nEMA20 ${fmt(ema20)} • EMA50 ${fmt(ema50)} • RSI ${fmt(rsi)} • MACD ${if (macdLine > macdSignal) "θετικό" else "αρνητικό"} • Όγκος ${fmt(volumeRatio)}x"
         return TechnicalSignal(symbol, direction, score, last, "1H", explanation, stopLoss, takeProfit, riskReward)
     }
 
