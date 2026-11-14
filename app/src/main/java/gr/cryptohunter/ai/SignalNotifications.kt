@@ -43,7 +43,8 @@ object SignalNotifications {
             .filter { it.score >= 80 && (it.direction == "BUY" || it.direction == "SELL") }
             .forEach { signal ->
                 val key = "${signal.symbol}_${signal.direction}"
-                if (preferences.getBoolean(key, false)) return@forEach
+                val lastNotified = preferences.getLong(key, 0L)
+                if (System.currentTimeMillis() - lastNotified < 6 * 60 * 60 * 1000L) return@forEach
 
                 val details = buildString {
                     append("Entry: ${format(signal.price)}")
@@ -67,7 +68,7 @@ object SignalNotifications {
 
                 try {
                     manager.notify(signal.symbol.hashCode(), notification)
-                    preferences.edit().putBoolean(key, true).apply()
+                    preferences.edit().putLong(key, System.currentTimeMillis()).apply()
                 } catch (_: SecurityException) {
                     // Notification permission may have been revoked while the app was open.
                 }
