@@ -30,6 +30,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 private val Bg = Color(0xFF080D1D)
 private val Panel = Color(0xCC17213A)
@@ -51,6 +57,7 @@ data class Signal(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        scheduleBackgroundMarketScan()
         setContent { CryptoHunterApp() }
     }
 }
@@ -314,4 +321,28 @@ fun TechnicalSignalList(signals: List<TechnicalSignal>) {
             }
         }
     }
+}
+
+
+private fun scheduleBackgroundMarketScan() {
+    val constraints = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.CONNECTED)
+        .build()
+
+    val request = PeriodicWorkRequestBuilder<BackgroundMarketWorker>(
+        15, TimeUnit.MINUTES
+    )
+        .setConstraints(constraints)
+        .setBackoffCriteria(
+            androidx.work.BackoffPolicy.EXPONENTIAL,
+            30,
+            TimeUnit.SECONDS
+        )
+        .build()
+
+    WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+        "crypto_hunter_background_scan",
+        ExistingPeriodicWorkPolicy.KEEP,
+        request
+    )
 }
