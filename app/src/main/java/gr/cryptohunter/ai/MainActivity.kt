@@ -1,8 +1,13 @@
 
 package gr.cryptohunter.ai
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +57,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun CryptoHunterApp() {
+    val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) SignalNotifications.createChannel(context)
+    }
     var tab by remember { mutableStateOf("Επισκόπηση") }
     var btcPrice by remember { mutableStateOf("--") }
     var connection by remember { mutableStateOf("Αναμονή σύνδεσης...") }
@@ -59,6 +72,7 @@ fun CryptoHunterApp() {
     var scanStatus by remember { mutableStateOf("Η τεχνική ανάλυση δεν έχει ξεκινήσει.") }
 
     LaunchedEffect(Unit) {
+        SignalNotifications.createChannel(context)
         while (true) {
             try {
                 val price = BinanceApi.getBitcoinPrice()
@@ -69,6 +83,7 @@ fun CryptoHunterApp() {
                     marketsError = ""
                     scanStatus = "Ανάλυση EMA, RSI, MACD και όγκου..."
                     technicalSignals = BinanceTechnicalApi.scan(markets.take(10).map { it.symbol })
+                    SignalNotifications.notifyStrongSignals(context, technicalSignals)
                     scanStatus = "Ολοκληρώθηκε ανάλυση ${technicalSignals.size} αγορών • 1H"
                 } catch (marketException: Exception) {
                     marketsError = marketException.message ?: "Αποτυχία φόρτωσης αγορών"
@@ -201,7 +216,25 @@ fun CryptoHunterApp() {
                         Text("Binance • Δημόσια δεδομένα", color = Color.White, fontWeight = FontWeight.Bold)
                         Divider(color = Color.White.copy(alpha = 0.10f))
                         Text("Push notifications", color = Muted, fontSize = 11.sp)
-                        Text("Υπό ανάπτυξη", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold)
+                        Text("Τοπικές ειδοποιήσεις για ισχυρά σήματα", color = Color.White, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= 33) {
+                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                                        SignalNotifications.createChannel(context)
+                                    } else {
+                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                } else {
+                                    SignalNotifications.createChannel(context)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Violet)
+                        ) {
+                            Text("Ενεργοποίηση ειδοποιήσεων", color = Color.White)
+                        }
+                        Text("Ειδοποίηση για βαθμολογία ≥80 • έως μία ανά σύμβολο/κατεύθυνση ανά 6 ώρες", color = Muted, fontSize = 10.sp)
                     }
                 }
             }
