@@ -2,6 +2,7 @@
 package gr.cryptohunter.ai
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -57,7 +58,7 @@ data class Signal(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        scheduleBackgroundMarketScan()
+        scheduleBackgroundMarketScan(applicationContext)
         setContent { CryptoHunterApp() }
     }
 }
@@ -324,7 +325,7 @@ fun TechnicalSignalList(signals: List<TechnicalSignal>) {
 }
 
 
-private fun scheduleBackgroundMarketScan() {
+private fun scheduleBackgroundMarketScan(context: Context) {
     val constraints = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
         .build()
@@ -340,7 +341,7 @@ private fun scheduleBackgroundMarketScan() {
         )
         .build()
 
-    WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+    WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
         "crypto_hunter_background_scan",
         ExistingPeriodicWorkPolicy.KEEP,
         request
