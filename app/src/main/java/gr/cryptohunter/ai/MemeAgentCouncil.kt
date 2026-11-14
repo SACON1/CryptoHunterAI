@@ -128,7 +128,7 @@ internal suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport
                 pulse.score <= 35 -> "ΑΡΝΗΤΙΚΟ SENTIMENT — ΧΡΕΙΑΖΕΤΑΙ ΕΛΕΓΧΟΣ"
                 else -> "ΟΥΔΕΤΕΡΟ SENTIMENT"
             },
-            newsDetail + if (pulse.items.isEmpty()) "" else " Πηγές: " + pulse.items.joinToString(" • ") { it.source },
+            newsDetail + if (pulse.items.isEmpty()) "" else "\nΑναφορές: " + pulse.items.take(3).joinToString(" | ") { "${it.source}: ${it.title}" },
             pulse.score,
             false
         )
