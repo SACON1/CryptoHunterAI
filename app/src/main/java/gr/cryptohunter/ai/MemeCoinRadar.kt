@@ -107,13 +107,14 @@ private suspend fun scanMemeCoins(): MemeScan = withContext(Dispatchers.IO) {
 }
 
 private fun usdShort(value: Double): String = when {
-    value >= 1_000_000 -> "$" + String.format(Locale.US, "%.2fM", value / 1_000_000)
-    value >= 1_000 -> "$" + String.format(Locale.US, "%.1fK", value / 1_000)
-    else -> "$" + String.format(Locale.US, "%.0f", value)
+    value >= 1_000_000 -> "\\$" + String.format(Locale.US, "%.2fM", value / 1_000_000)
+    value >= 1_000 -> "\\$" + String.format(Locale.US, "%.1fK", value / 1_000)
+    else -> "\\$" + String.format(Locale.US, "%.0f", value)
 }
 
 @Composable
 fun MemeCoinRadarScreen() {
+    val context = LocalContext.current
     var scan by remember { mutableStateOf<MemeScan?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
@@ -134,7 +135,7 @@ fun MemeCoinRadarScreen() {
             TextButton(onClick = { selected = null }) { Text("← Πίσω στη λίστα", color = Color(0xFF45D9FF)) }
             Text(coin.name, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
             Text("${coin.symbol} • ${coin.chain}", color = Color(0xFF45D9FF), fontWeight = FontWeight.Bold)
-            Text("Τιμή: $${coin.price}", color = Color.White)
+            Text("Τιμή: \\${coin.price}", color = Color.White)
             Text("Liquidity: ${usdShort(coin.liquidity)}", color = Color.White)
             Text("Όγκος 24h: ${usdShort(coin.volume24h)}", color = Color.White)
             Text("Μεταβολή 24h: ${String.format(Locale.US, "%.2f", coin.change24h)}%", color = if (coin.change24h >= 0) Color(0xFF42E6B0) else Color(0xFFFF7185))
@@ -144,8 +145,8 @@ fun MemeCoinRadarScreen() {
             Divider(color = Color.White.copy(alpha = .15f))
             Text("Έλεγχος κινδύνου", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold)
             val flags = buildList {
-                if (coin.liquidity < 10000) add("Πολύ χαμηλή ρευστότητα (<$10K)")
-                if (coin.volume24h < 5000) add("Χαμηλός όγκος 24h (<$5K)")
+                if (coin.liquidity < 10000) add("Πολύ χαμηλή ρευστότητα (<\\$10K)")
+                if (coin.volume24h < 5000) add("Χαμηλός όγκος 24h (<\\$5K)")
                 if (coin.ageHours != null && coin.ageHours < 24) add("Νέο pair κάτω των 24 ωρών")
                 if (coin.transactions < 20) add("Λίγες συναλλαγές 24h")
                 if (coin.marketCap <= 0) add("Δεν υπάρχει διαθέσιμο market cap")
@@ -154,7 +155,7 @@ fun MemeCoinRadarScreen() {
             else flags.forEach { Text("⚠ $it", color = Color(0xFFFFC857), fontSize = 12.sp) }
             Text("Δεν ελέγχθηκαν ακόμη owner privileges, mint/freeze authority, holder concentration, developer history ή honeypot με ανεξάρτητο on-chain scanner.", color = Color(0xFFA7B4D0), fontSize = 11.sp)
             if (coin.url.startsWith("https://")) {
-                Button(onClick = { val ctx = androidx.compose.ui.platform.LocalContext.current; ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(coin.url))) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B75FF))) {
+                Button(onClick = { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(coin.url))) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B75FF))) {
                     Text("Άνοιγμα DexScreener", color = Color.White)
                 }
             }
