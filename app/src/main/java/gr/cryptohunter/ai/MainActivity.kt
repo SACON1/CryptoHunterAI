@@ -93,6 +93,7 @@ fun CryptoHunterApp() {
 
     LaunchedEffect(Unit) {
         SignalNotifications.createChannel(context)
+        var lastTechnicalScanAt = 0L
         while (true) {
             try {
                 val price = BinanceApi.getBitcoinPrice()
@@ -101,10 +102,16 @@ fun CryptoHunterApp() {
                 try {
                     markets = BinanceApi.getTopUsdtMarkets()
                     marketsError = ""
-                    scanStatus = "Ανάλυση EMA, RSI, MACD και όγκου..."
-                    technicalSignals = BinanceTechnicalApi.scan(markets.take(10).map { it.symbol })
-                    SignalNotifications.notifyStrongSignals(context, technicalSignals)
-                    scanStatus = "Ολοκληρώθηκε ανάλυση ${technicalSignals.size} αγορών • 1H"
+                    val now = System.currentTimeMillis()
+                    if (now - lastTechnicalScanAt >= 5 * 60 * 1000L) {
+                        scanStatus = "Ανάλυση και των 50 αγορών με EMA, RSI, MACD και όγκο..."
+                        technicalSignals = BinanceTechnicalApi.scan(markets.take(50).map { it.symbol })
+                        SignalNotifications.notifyStrongSignals(context, technicalSignals)
+                        lastTechnicalScanAt = now
+                        val buyCount = technicalSignals.count { it.direction == "BUY" }
+                        val sellCount = technicalSignals.count { it.direction == "SELL" }
+                        scanStatus = "Ελέγχθηκαν ${markets.take(50).size} αγορές • BUY: ${buyCount} • SELL: ${sellCount} • WAIT: ${technicalSignals.count { it.direction == "WAIT" }}"
+                    }
                 } catch (marketException: Exception) {
                     marketsError = marketException.message ?: "Αποτυχία φόρτωσης αγορών"
                     scanStatus = "Δεν ήταν δυνατή η ανάλυση αγοράς."
@@ -200,7 +207,7 @@ fun CryptoHunterApp() {
                     }
                 }
                 "Σήματα" -> {
-                    SectionTitle("Τεχνικά σήματα", "TOP 10 • BINANCE • 1H")
+                    SectionTitle("Τεχνικά σήματα", "TOP 50 • BINANCE • 1H • ΑΝΑΝΕΩΣΗ ΑΝΑ 5 ΛΕΠΤΑ")
                     Text(scanStatus, color = Muted, fontSize = 11.sp)
                     Spacer(Modifier.height(10.dp))
                     if (technicalSignals.isNotEmpty()) {
