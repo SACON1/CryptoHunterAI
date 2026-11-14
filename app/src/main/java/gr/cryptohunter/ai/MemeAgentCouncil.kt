@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-private data class MemeAgentVote(
+internal data class MemeAgentVote(
     val name: String,
     val verdict: String,
     val detail: String,
@@ -20,7 +20,7 @@ private data class MemeAgentVote(
     val danger: Boolean = false
 )
 
-private data class MemeCouncilReport(
+internal data class MemeCouncilReport(
     val score: Int,
     val verdict: String,
     val votes: List<MemeAgentVote>,
@@ -28,7 +28,7 @@ private data class MemeCouncilReport(
     val caveat: String
 )
 
-private suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport {
+internal suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport {
     val votes = mutableListOf<MemeAgentVote>()
 
     val liquidityScore = when {
