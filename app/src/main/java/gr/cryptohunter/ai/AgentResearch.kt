@@ -33,7 +33,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private data class AgentItem(val title:String,val source:String,val url:String,val summary:String,val category:String)
-private data class AgentData(val tokens:List<AgentItem>,val boosts:List<AgentItem>,val social:List<AgentItem>,val news:List<AgentItem>,val time:String)
+private data class AgentData(val tokens:List<AgentItem>,val boosts:List<AgentItem>,val social:List<AgentItem>,val news:List<AgentItem>,val memes:List<MemeCandidate>,val time:String)
 
 private fun agentGet(url:String):String {
     val c=URL(url).openConnection() as HttpURLConnection
@@ -87,7 +87,8 @@ private suspend fun fetchAgentData():AgentData=withContext(Dispatchers.IO) {
     val social=socialFeeds.flatMapIndexed { i,url -> runCatching { agentRss(agentGet(url),listOf("r/CryptoCurrency","r/solana","r/memecoins")[i],"SOCIAL") }.getOrDefault(emptyList()) }.take(25)
     val newsFeeds=listOf("https://cointelegraph.com/rss","https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml","https://www.theblock.co/rss.xml")
     val news=newsFeeds.flatMapIndexed { i,url -> runCatching { agentRss(agentGet(url),listOf("Cointelegraph","CoinDesk","The Block")[i],"NEWS") }.getOrDefault(emptyList()) }.take(30)
-    AgentData(tokens,boosts,social,news,java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date()))
+    val memeCoins=runCatching { scanMemeCoins().coins }.getOrDefault(emptyList())
+    AgentData(tokens,boosts,social,news,memeCoins,java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date()))
 }
 
 private fun agentMood(text:String):Pair<String,Color> {
@@ -149,7 +150,7 @@ fun AgentResearchScreen() {
     var data by remember { mutableStateOf<AgentData?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
-    var tab by remember { mutableStateOf("SOCIAL") }
+    var tab by remember { mutableStateOf("MEME") }
     var refresh by remember { mutableIntStateOf(0) }
     LaunchedEffect(refresh) {
         loading=true; error=""
@@ -158,7 +159,8 @@ fun AgentResearchScreen() {
         finally { loading=false }
     }
     LaunchedEffect(Unit) { while(true) { delay(5*60*1000L); refresh++ } }
-    val list=when(tab) { "SOCIAL"->data?.social.orEmpty(); "NEWS"->data?.news.orEmpty(); "TOKENS"->data?.tokens.orEmpty(); else->data?.boosts.orEmpty() }
+    val list=when(tab) { "SOCIAL"->data?.social.orEmpty(); "NEWS"->data?.news.orEmpty(); "TOKENS"->data?.tokens.orEmpty(); "BOOSTS"->data?.boosts.orEmpty(); else->emptyList() }
+    val memeList=data?.memes.orEmpty()
     Column(verticalArrangement=Arrangement.spacedBy(11.dp)) {
         AgentCoreAnimation(isScanning=loading)
         Text("CRYPTO HUNTER • LIVE AGENT",color=Color(0xFF45D9FF),fontSize=10.sp,fontWeight=FontWeight.Bold)
@@ -175,14 +177,51 @@ fun AgentResearchScreen() {
             TextButton(onClick={refresh++}) { Text("↻ Σάρωση τώρα",color=Color(0xFF45D9FF)) }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            listOf("SOCIAL","NEWS","TOKENS","BOOSTS").forEach { key ->
-                FilterChip(selected=tab==key,onClick={tab=key},label={Text(when(key){"SOCIAL"->"Social";"NEWS"->"News";"TOKENS"->"New";else->"Boosts"},fontSize=9.sp)})
+            listOf("MEME","SOCIAL","NEWS","TOKENS","BOOSTS").forEach { key ->
+                FilterChip(selected=tab==key,onClick={tab=key},label={Text(when(key){"MEME"->"Meme Radar";"SOCIAL"->"Social";"NEWS"->"News";"TOKENS"->"New";else->"Boosts"},fontSize=9.sp)})
             }
         }
         if(error.isNotBlank()) Text(error,color=Color(0xFFFFC857),fontSize=11.sp)
+        if(tab=="MEME") Text("Ο Agent συνδυάζει live meme coin pairs με ειδήσεις και δημόσιες συζητήσεις. Οι αντιστοιχίσεις είναι ενδείξεις για έλεγχο, όχι απόδειξη ότι μια είδηση προκαλεί κίνηση.",color=Color(0xFFA7B4D0),fontSize=10.sp)
         if(tab=="SOCIAL") Text("Δημόσιες συζητήσεις Reddit μέσω RSS. Η ένδειξη κλίματος είναι απλή ανάλυση λέξεων, όχι AI πρόβλεψη.",color=Color(0xFFA7B4D0),fontSize=10.sp)
         if(tab=="BOOSTS") Text("Τα boosts είναι πληρωμένη προβολή — όχι απόδειξη ποιότητας ή ασφάλειας.",color=Color(0xFFFFC857),fontSize=10.sp)
-        if(list.isEmpty() && !loading) Text("Δεν υπάρχουν διαθέσιμα αποτελέσματα αυτή τη στιγμή.",color=Color(0xFFA7B4D0),fontSize=12.sp)
+        if(tab=="MEME") {
+            if(memeList.isEmpty() && !loading) Text("Δεν βρέθηκαν live meme coin pairs από τις πηγές αυτή τη στιγμή.",color=Color(0xFFA7B4D0),fontSize=12.sp)
+            memeList.forEach { coin ->
+                val related = (data?.news.orEmpty() + data?.social.orEmpty()).filter { item ->
+                    val haystack=(item.title+" "+item.summary).lowercase()
+                    val symbol=coin.symbol.lowercase()
+                    val name=coin.name.lowercase()
+                    haystack.contains(symbol) || (name.length>=5 && haystack.contains(name))
+                }.take(3)
+                val redFlags=buildList {
+                    if(coin.liquidity<10000) add("Χαμηλή ρευστότητα")
+                    if(coin.volume24h<5000) add("Χαμηλός όγκος")
+                    if(coin.ageHours!=null && coin.ageHours<24) add("Pair κάτω των 24 ωρών")
+                    if(coin.transactions<20) add("Λίγες συναλλαγές")
+                    if(coin.marketCap<=0) add("Άγνωστο market cap")
+                }
+                val score=(100-redFlags.size*18).coerceAtLeast(10)
+                Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xDD1D2945),Color(0xCC111A30))),RoundedCornerShape(16.dp)).border(1.dp,Color(0x559B75FF),RoundedCornerShape(16.dp)).padding(13.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        Column(Modifier.weight(1f)) {
+                            Text(coin.name,color=Color.White,fontWeight=FontWeight.Bold,fontSize=13.sp,maxLines=1)
+                            Text("${coin.symbol} • ${coin.chain}",color=Color(0xFF45D9FF),fontSize=10.sp)
+                        }
+                        Text("RADAR ${score}/100",color=if(score>=70)Color(0xFF42E6B0) else Color(0xFFFFC857),fontSize=9.sp,fontWeight=FontWeight.Bold)
+                    }
+                    Text("LP ${usdShort(coin.liquidity)} • Vol ${usdShort(coin.volume24h)} • 24h ${String.format(java.util.Locale.US,"%.1f",coin.change24h)}%",color=Color.White,fontSize=10.sp)
+                    Text(if(redFlags.isEmpty()) "Δεν βρέθηκαν τα βασικά market red flags" else "Έλεγχοι: "+redFlags.joinToString(" • "),color=Color(0xFFFFC857),fontSize=10.sp)
+                    Text(if(related.isEmpty()) "Δεν βρέθηκε άμεση αναφορά σε τρέχοντα headlines/social feeds." else "Σχετικές αναφορές (${related.size})",color=Color(0xFF45D9FF),fontSize=10.sp,fontWeight=FontWeight.Bold)
+                    related.forEach { item ->
+                        Text("• ${item.source}: ${item.title}",color=Color(0xFFA7B4D0),fontSize=10.sp,maxLines=2)
+                        if(item.url.startsWith("https://")) TextButton(onClick={context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(item.url)))}) { Text("Άνοιγμα αναφοράς ↗",color=Color(0xFF42E6B0),fontSize=9.sp) }
+                    }
+                    if(coin.url.startsWith("https://")) TextButton(onClick={context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(coin.url)))}) { Text("Άνοιγμα coin στο DexScreener ↗",color=Color(0xFF45D9FF),fontSize=10.sp) }
+                }
+            }
+        }
+        if(tab!="MEME" && list.isEmpty() && !loading) Text("Δεν υπάρχουν διαθέσιμα αποτελέσματα αυτή τη στιγμή.",color=Color(0xFFA7B4D0),fontSize=12.sp)
         list.forEach { item ->
             val mood=agentMood(item.title+" "+item.summary)
             Column(Modifier.fillMaxWidth().background(Color(0xCC17213A),RoundedCornerShape(16.dp)).border(1.dp,Color(0x339B75FF),RoundedCornerShape(16.dp)).padding(13.dp)) {
