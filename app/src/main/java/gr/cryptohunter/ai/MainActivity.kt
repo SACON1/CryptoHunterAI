@@ -231,21 +231,23 @@ fun CryptoHunterApp() {
                         Text("Push notifications", color = Muted, fontSize = 11.sp)
                         Text("Τοπικές ειδοποιήσεις για ισχυρά σήματα", color = Color.White, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(10.dp))
-                        Button(
-                            onClick = {
-                                if (Build.VERSION.SDK_INT >= 33) {
-                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-                                        SignalNotifications.createChannel(context)
-                                    } else {
-                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                } else {
-                                    SignalNotifications.createChannel(context)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Violet)
-                        ) {
-                            Text("Ενεργοποίηση ειδοποιήσεων", color = Color.White)
+                        Text(if (notificationsEnabled) "● ΕΙΔΟΠΟΙΗΣΕΙΣ ΕΝΕΡΓΕΣ" else "● ΕΙΔΟΠΟΙΗΣΕΙΣ ΑΝΕΝΕΡΓΕΣ", color = if (notificationsEnabled) Green else Color(0xFFFFC857), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick = {
+                            if (!notificationsEnabled && Build.VERSION.SDK_INT >= 33) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else if (!notificationsEnabled) {
+                                context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply { putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName) })
+                            } else {
+                                SignalNotifications.sendTestNotification(context)
+                            }
+                        }, colors = ButtonDefaults.buttonColors(containerColor = Violet)) {
+                            Text(if (notificationsEnabled) "Δοκιμή ειδοποίησης" else "Ενεργοποίηση ειδοποιήσεων", color = Color.White)
+                        }
+                        OutlinedButton(onClick = {
+                            context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply { putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName) })
+                        }, colors = ButtonDefaults.outlinedButtonColors(contentColor = Muted)) {
+                            Text("Ρυθμίσεις ειδοποιήσεων κινητού")
                         }
                         Text("Ειδοποίηση για βαθμολογία ≥80 • έως μία ανά σύμβολο/κατεύθυνση ανά 6 ώρες", color = Muted, fontSize = 10.sp)
                     }
