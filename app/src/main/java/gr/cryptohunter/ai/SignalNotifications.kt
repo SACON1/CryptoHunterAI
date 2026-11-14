@@ -28,6 +28,36 @@ object SignalNotifications {
         }
     }
 
+
+    fun areNotificationsEnabled(context: Context): Boolean {
+        val permissionGranted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        return permissionGranted && NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+
+    fun sendTestNotification(context: Context) {
+        if (!areNotificationsEnabled(context)) return
+        createChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Crypto Hunter AI")
+            .setContentText("Οι ειδοποιήσεις λειτουργούν σωστά στο κινητό σου.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                "Η εφαρμογή μπορεί να εμφανίζει τοπικές ειδοποιήσεις όταν εντοπίζει ισχυρά τεχνικά σήματα."
+            ))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(900001, notification)
+        } catch (_: SecurityException) {
+            // Permission may have been revoked between the check and delivery.
+        }
+    }
+
     fun notifyStrongSignals(context: Context, signals: List<TechnicalSignal>) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(
