@@ -99,6 +99,55 @@ private fun agentMood(text:String):Pair<String,Color> {
 }
 
 
+private data class MemeAnalysis(
+    val mentions: List<AgentItem>,
+    val topics: List<String>,
+    val tone: String,
+    val explanation: String
+)
+
+private fun hasTerm(text: String, term: String): Boolean {
+    val t=term.lowercase()
+    if(t.length<=4) return Regex("(^|[^a-z0-9])"+Regex.escape(t)+"([^a-z0-9]|$)").containsMatchIn(text)
+    return text.contains(t)
+}
+
+private fun analyzeMemeContext(coin:MemeCandidate, news:List<AgentItem>, social:List<AgentItem>):MemeAnalysis {
+    val symbol=coin.symbol.lowercase().trim()
+    val name=coin.name.lowercase().trim()
+    val all=(news+social).distinctBy { it.url.ifBlank { it.source+it.title } }
+    val mentions=all.filter { item ->
+        val text=(item.title+" "+item.summary).lowercase()
+        (name.length>=4 && text.contains(name)) || (symbol.length>=3 && hasTerm(text,symbol))
+    }.take(5)
+    val corpus=mentions.joinToString(" ") { it.title+" "+it.summary }.lowercase()
+    val topics=buildList {
+        if(listOf("trump","president","election","white house","politic","πολιτικ","εκλογ","πρόεδρος").any{hasTerm(corpus,it)}) add("Πολιτική")
+        if(listOf("elon","musk","celebrity","influencer","celeb","διάσημ").any{hasTerm(corpus,it)}) add("Πρόσωπα / influencers")
+        if(listOf("listing","listed","exchange","binance","coinbase","kraken","εισαγωγ","καταχώρ").any{hasTerm(corpus,it)}) add("Listings / ανταλλακτήρια")
+        if(listOf("launch","launched","fair launch","presale","airdrop","κυκλοφορία","λανσάρ").any{hasTerm(corpus,it)}) add("Launch / διανομή")
+        if(listOf("hack","exploit","rug pull","scam","fraud","phishing","κλοπή","απάτη").any{hasTerm(corpus,it)}) add("Ασφάλεια / πιθανή απάτη")
+        if(listOf("partnership","partner","integration","collaboration","συνεργασία").any{hasTerm(corpus,it)}) add("Συνεργασία")
+    }
+    val positive=listOf("bullish","surge","rally","adoption","listing","partnership","breakout","άνοδο","θετικ")
+        .sumOf { term -> mentions.count { hasTerm((it.title+" "+it.summary).lowercase(),term) } }
+    val negative=listOf("scam","rug","hack","exploit","dump","fraud","warning","lawsuit","crash","απάτη","προειδοπ")
+        .sumOf { term -> mentions.count { hasTerm((it.title+" "+it.summary).lowercase(),term) } }
+    val tone=when {
+        mentions.isEmpty()->"Δεν υπάρχει αρκετό σχετικό περιεχόμενο"
+        negative>positive->"Αρνητικές ενδείξεις στις αναφορές"
+        positive>negative->"Θετικές λέξεις στις αναφορές"
+        else->"Μικτό / ουδέτερο περιεχόμενο"
+    }
+    val explanation=when {
+        mentions.isEmpty()->"Δεν βρέθηκε αναφορά που να ταιριάζει καθαρά με το όνομα ή το σύμβολο του token στις πηγές που ελέγχθηκαν."
+        topics.isNotEmpty()->"Βρέθηκαν ${mentions.size} σχετικές αναφορές. Θέματα: ${topics.joinToString(", ")}. Άνοιξε τις πηγές για επιβεβαίωση."
+        else->"Βρέθηκαν ${mentions.size} αναφορές με αντιστοίχιση ονόματος/συμβόλου. Δεν προκύπτει ακόμη σαφές γεγονός."
+    }
+    return MemeAnalysis(mentions,topics,tone,explanation)
+}
+
+
 @Composable
 private fun AgentCoreAnimation(isScanning:Boolean) {
     val transition= rememberInfiniteTransition(label="agent-core")
@@ -182,18 +231,14 @@ fun AgentResearchScreen() {
             }
         }
         if(error.isNotBlank()) Text(error,color=Color(0xFFFFC857),fontSize=11.sp)
-        if(tab=="MEME") Text("Ο Agent συνδυάζει live meme coin pairs με ειδήσεις και δημόσιες συζητήσεις. Οι αντιστοιχίσεις είναι ενδείξεις για έλεγχο, όχι απόδειξη ότι μια είδηση προκαλεί κίνηση.",color=Color(0xFFA7B4D0),fontSize=10.sp)
+        if(tab=="MEME") Text("Δωρεάν ανάλυση κανόνων: αντιστοίχιση ονόματος/συμβόλου, θεματικές ειδήσεων, θετικό/αρνητικό λεξιλόγιο και market red flags. Δεν είναι ακόμη μεγάλο γλωσσικό μοντέλο και δεν αποδεικνύει αιτιώδη σχέση.",color=Color(0xFFA7B4D0),fontSize=10.sp)
         if(tab=="SOCIAL") Text("Δημόσιες συζητήσεις Reddit μέσω RSS. Η ένδειξη κλίματος είναι απλή ανάλυση λέξεων, όχι AI πρόβλεψη.",color=Color(0xFFA7B4D0),fontSize=10.sp)
         if(tab=="BOOSTS") Text("Τα boosts είναι πληρωμένη προβολή — όχι απόδειξη ποιότητας ή ασφάλειας.",color=Color(0xFFFFC857),fontSize=10.sp)
         if(tab=="MEME") {
             if(memeList.isEmpty() && !loading) Text("Δεν βρέθηκαν live meme coin pairs από τις πηγές αυτή τη στιγμή.",color=Color(0xFFA7B4D0),fontSize=12.sp)
             memeList.forEach { coin ->
-                val related = (data?.news.orEmpty() + data?.social.orEmpty()).filter { item ->
-                    val haystack=(item.title+" "+item.summary).lowercase()
-                    val symbol=coin.symbol.lowercase()
-                    val name=coin.name.lowercase()
-                    haystack.contains(symbol) || (name.length>=5 && haystack.contains(name))
-                }.take(3)
+                val analysis=analyzeMemeContext(coin,data?.news.orEmpty(),data?.social.orEmpty())
+                val related=analysis.mentions.take(3)
                 val redFlags=buildList {
                     if(coin.liquidity<10000) add("Χαμηλή ρευστότητα")
                     if(coin.volume24h<5000) add("Χαμηλός όγκος")
@@ -208,11 +253,14 @@ fun AgentResearchScreen() {
                             Text(coin.name,color=Color.White,fontWeight=FontWeight.Bold,fontSize=13.sp,maxLines=1)
                             Text("${coin.symbol} • ${coin.chain}",color=Color(0xFF45D9FF),fontSize=10.sp)
                         }
-                        Text("RADAR ${score}/100",color=if(score>=70)Color(0xFF42E6B0) else Color(0xFFFFC857),fontSize=9.sp,fontWeight=FontWeight.Bold)
+                        Text("MARKET FLAGS ${redFlags.size}",color=if(redFlags.size>=3)Color(0xFFFF7185) else Color(0xFFFFC857),fontSize=9.sp,fontWeight=FontWeight.Bold)
                     }
                     Text("LP ${usdShort(coin.liquidity)} • Vol ${usdShort(coin.volume24h)} • 24h ${String.format(java.util.Locale.US,"%.1f",coin.change24h)}%",color=Color.White,fontSize=10.sp)
                     Text(if(redFlags.isEmpty()) "Δεν βρέθηκαν τα βασικά market red flags" else "Έλεγχοι: "+redFlags.joinToString(" • "),color=Color(0xFFFFC857),fontSize=10.sp)
-                    Text(if(related.isEmpty()) "Δεν βρέθηκε άμεση αναφορά σε τρέχοντα headlines/social feeds." else "Σχετικές αναφορές (${related.size})",color=Color(0xFF45D9FF),fontSize=10.sp,fontWeight=FontWeight.Bold)
+                    Text("Ανάλυση Agent • ${analysis.tone}",color=if(analysis.tone.startsWith("Αρνητικές"))Color(0xFFFF7185) else Color(0xFF45D9FF),fontSize=10.sp,fontWeight=FontWeight.Bold)
+                    Text(analysis.explanation,color=Color(0xFFA7B4D0),fontSize=10.sp)
+                    if(analysis.topics.isNotEmpty()) Text("Θέματα: ${analysis.topics.joinToString(" • ")}",color=Color(0xFFB69BFF),fontSize=10.sp)
+                    Text(if(related.isEmpty()) "Δεν υπάρχουν σχετικές αναφορές." else "Σχετικές πηγές (${related.size})",color=Color(0xFF45D9FF),fontSize=10.sp,fontWeight=FontWeight.Bold)
                     related.forEach { item ->
                         Text("• ${item.source}: ${item.title}",color=Color(0xFFA7B4D0),fontSize=10.sp,maxLines=2)
                         if(item.url.startsWith("https://")) TextButton(onClick={context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(item.url)))}) { Text("Άνοιγμα αναφοράς ↗",color=Color(0xFF42E6B0),fontSize=9.sp) }
@@ -236,6 +284,6 @@ fun AgentResearchScreen() {
                 if(item.url.startsWith("https://")) TextButton(onClick={context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(item.url)))}) { Text("Άνοιγμα πηγής ↗",color=Color(0xFF42E6B0),fontSize=10.sp) }
             }
         }
-        Text("Το X δεν έχει συνδεθεί ακόμη: απαιτείται επίσημη πρόσβαση API. Για επίσημη και σταθερή πρόσβαση στο Reddit χρειάζεται εγκεκριμένο OAuth. Δεν υπάρχει ακόμη LLM ανάλυση, background cloud agent ή αυτόματη αγορά.",color=Color(0xFFA7B4D0),fontSize=10.sp)
+        Text("Το X δεν έχει συνδεθεί ακόμη: απαιτείται επίσημη πρόσβαση API. Για επίσημη και σταθερή πρόσβαση στο Reddit χρειάζεται εγκεκριμένο OAuth. Η ανάλυση είναι δωρεάν λογική κανόνων — όχι LLM, background cloud agent ή αυτόματη αγορά.",color=Color(0xFFA7B4D0),fontSize=10.sp)
     }
 }
