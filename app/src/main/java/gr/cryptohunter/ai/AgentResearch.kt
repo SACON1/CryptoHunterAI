@@ -4,6 +4,14 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Xml
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -89,6 +97,52 @@ private fun agentMood(text:String):Pair<String,Color> {
     return when { pos>neg -> "Θετικό λεξιλόγιο • όχι πρόβλεψη" to Color(0xFF42E6B0); neg>pos -> "Αρνητικό λεξιλόγιο • προσοχή" to Color(0xFFFF7185); else -> "Μικτό / ουδέτερο" to Color(0xFFFFC857) }
 }
 
+
+@Composable
+private fun AgentCoreAnimation(isScanning:Boolean) {
+    val transition= rememberInfiniteTransition(label="agent-core")
+    val pulse by transition.animateFloat(
+        initialValue=0.78f, targetValue=1.08f,
+        animationSpec=infiniteRepeatable(tween(1500),RepeatMode.Reverse),
+        label="core-pulse"
+    )
+    val rotation by transition.animateFloat(
+        initialValue=0f, targetValue=360f,
+        animationSpec=infiniteRepeatable(tween(if(isScanning) 5000 else 9000)),
+        label="core-rotation"
+    )
+    val wave by transition.animateFloat(
+        initialValue=0.18f,targetValue=0.82f,
+        animationSpec=infiniteRepeatable(tween(1100),RepeatMode.Reverse),
+        label="core-wave"
+    )
+    Box(Modifier.fillMaxWidth(), contentAlignment=androidx.compose.ui.Alignment.Center) {
+        Canvas(Modifier.size(184.dp)) {
+            val c=center
+            val radius=size.minDimension*0.43f
+            drawCircle(
+                brush=Brush.radialGradient(listOf(Color(0x6645D9FF),Color(0x449B75FF),Color.Transparent),center=c,radius=radius*1.5f),
+                radius=radius*1.5f,center=c
+            )
+            drawCircle(Color(0x669B75FF),radius=radius*pulse,center=c,style=Stroke(width=2.dp.toPx()))
+            drawCircle(Color(0xAA45D9FF),radius=radius*0.72f,center=c,style=Stroke(width=1.5.dp.toPx()))
+            drawCircle(Color(0x8842E6B0),radius=radius*(0.52f+wave*0.08f),center=c,style=Stroke(width=2.dp.toPx()))
+            for(i in 0 until 4) {
+                val angle=Math.toRadians((rotation+i*90.0))
+                val inner=radius*0.78f
+                val outer=radius*(0.98f+wave*0.10f)
+                val x1=c.x+ kotlin.math.cos(angle).toFloat()*inner
+                val y1=c.y+ kotlin.math.sin(angle).toFloat()*inner
+                val x2=c.x+ kotlin.math.cos(angle).toFloat()*outer
+                val y2=c.y+ kotlin.math.sin(angle).toFloat()*outer
+                drawLine(Color(0xFFB69BFF),androidx.compose.ui.geometry.Offset(x1,y1),androidx.compose.ui.geometry.Offset(x2,y2),strokeWidth=3.dp.toPx(),cap=StrokeCap.Round)
+            }
+            drawCircle(Color(0xFF9B75FF),radius=radius*0.34f*pulse,center=c)
+            drawCircle(Color(0xFF45D9FF),radius=radius*0.18f,center=c)
+        }
+    }
+}
+
 @Composable
 fun AgentResearchScreen() {
     val context=LocalContext.current
@@ -106,6 +160,7 @@ fun AgentResearchScreen() {
     LaunchedEffect(Unit) { while(true) { delay(5*60*1000L); refresh++ } }
     val list=when(tab) { "SOCIAL"->data?.social.orEmpty(); "NEWS"->data?.news.orEmpty(); "TOKENS"->data?.tokens.orEmpty(); else->data?.boosts.orEmpty() }
     Column(verticalArrangement=Arrangement.spacedBy(11.dp)) {
+        AgentCoreAnimation(isScanning=loading)
         Text("CRYPTO HUNTER • LIVE AGENT",color=Color(0xFF45D9FF),fontSize=10.sp,fontWeight=FontWeight.Bold)
         Text("Ο ερευνητής της αγοράς σου.",color=Color.White,fontSize=21.sp,fontWeight=FontWeight.ExtraBold)
         Text("Συζητήσεις • Ειδήσεις • Νέα tokens • Προωθήσεις",color=Color(0xFFA7B4D0),fontSize=11.sp)
