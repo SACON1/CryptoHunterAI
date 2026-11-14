@@ -18,7 +18,10 @@ data class TechnicalSignal(
     val score: Int,
     val price: Double,
     val timeframe: String,
-    val explanation: String
+    val explanation: String,
+    val stopLoss: Double?,
+    val takeProfit: Double?,
+    val riskReward: Double?
 )
 
 object TechnicalAnalysis {
@@ -41,6 +44,7 @@ object TechnicalAnalysis {
         val avgVolume = recentVolumes.average().takeIf { it > 0.0 } ?: 0.0
         val volumeRatio = if (avgVolume > 0.0) candles.last().volume / avgVolume else 1.0
         val recent = candles.takeLast(20)
+        val atr = atr(candles, 14)
         val support = recent.minOf { it.low }
         val resistance = recent.maxOf { it.high }
 
@@ -76,8 +80,21 @@ object TechnicalAnalysis {
             score <= 30 && trend <= 35 && macdScore <= 35 -> "SELL"
             else -> "WAIT"
         }
+        val stopLoss = when (direction) {
+            "BUY" -> last - atr * 1.5
+            "SELL" -> last + atr * 1.5
+            else -> null
+        }
+        val takeProfit = when (direction) {
+            "BUY" -> last + atr * 3.0
+            "SELL" -> last - atr * 3.0
+            else -> null
+        }
+        val riskReward = if (stopLoss != null && takeProfit != null) {
+            abs(takeProfit - last) / abs(last - stopLoss).coerceAtLeast(1e-12)
+        } else null
         val explanation = "EMA20 ${fmt(ema20)} • EMA50 ${fmt(ema50)} • RSI ${fmt(rsi)} • MACD ${if (macdLine > macdSignal) "θετικό" else "αρνητικό"} • Όγκος ${fmt(volumeRatio)}x"
-        return TechnicalSignal(symbol, direction, score, last, "1H", explanation)
+        return TechnicalSignal(symbol, direction, score, last, "1H", explanation, stopLoss, takeProfit, riskReward)
     }
 
     private fun ema(values: List<Double>, period: Int): Double {
@@ -96,6 +113,17 @@ object TechnicalAnalysis {
         if (losses == 0.0) return 100.0
         val rs = gains / losses
         return 100.0 - 100.0 / (1.0 + rs)
+    }
+
+    private fun atr(candles: List<Candle>, period: Int): Double {
+        val ranges = candles.zipWithNext().map { (previous, current) ->
+            max(
+                current.high - current.low,
+                max(abs(current.high - previous.close), abs(current.low - previous.close))
+            )
+        }
+        return ranges.takeLast(period).average().takeIf { it.isFinite() && it > 0.0 }
+            ?: candles.last().close * 0.01
     }
 
     private fun fmt(value: Double): String = String.format(java.util.Locale.US, "%.2f", value)
