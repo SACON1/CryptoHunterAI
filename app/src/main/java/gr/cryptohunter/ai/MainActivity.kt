@@ -326,7 +326,10 @@ fun TechnicalSignalList(signals: List<TechnicalSignal>) {
                         }, fontWeight = FontWeight.Bold)
                     }
                     Text("Βαθμολογία ${signal.score}/100 • ${signal.timeframe}", color = Muted, fontSize = 12.sp)
-                    Text("Τιμή: ${signal.price}", color = Green, fontSize = 12.sp)
+                    Text("Τιμή εισόδου: ${signal.price}", color = Green, fontSize = 12.sp)
+                    signal.stopLoss?.let { Text("Stop Loss: $it", color = Color(0xFFFF6677), fontSize = 12.sp) }
+                    signal.takeProfit?.let { Text("Take Profit: $it", color = Green, fontSize = 12.sp) }
+                    signal.riskReward?.let { Text("Risk / Reward: 1:${String.format(java.util.Locale.US, "%.1f", it)}", color = Color(0xFFFFC857), fontSize = 12.sp) }
                     Text(signal.explanation, color = Muted, fontSize = 11.sp)
                 }
             }
