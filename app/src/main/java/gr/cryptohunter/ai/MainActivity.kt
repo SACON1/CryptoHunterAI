@@ -394,6 +394,23 @@ fun TechnicalSignalList(signals: List<TechnicalSignal>) {
                         ) {
                             Text("Αντιγραφή διεύθυνσης ${contract.network}")
                         }
+                        if (contract.network.equals("Solana", ignoreCase = true)) {
+                            OutlinedButton(
+                                onClick = {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://pump.fun/"))
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Άνοιγμα Pump.fun")
+                            }
+                            Text(
+                                "Άνοιξε το Pump.fun και επικόλλησε εκεί το Mint Address. Η εμφάνιση διεύθυνσης Solana δεν σημαίνει ότι το token είναι καταχωρισμένο ή διαθέσιμο στο Pump.fun. Έλεγξε όνομα, σύμβολο, δίκτυο και ρευστότητα πριν από οποιαδήποτε αγορά.",
+                                color = Muted,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                 }
             }
