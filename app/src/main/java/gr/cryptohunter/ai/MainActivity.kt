@@ -45,6 +45,8 @@ fun CryptoHunterApp() {
     var tab by remember { mutableStateOf("Επισκόπηση") }
     var btcPrice by remember { mutableStateOf("--") }
     var connection by remember { mutableStateOf("Αναμονή σύνδεσης...") }
+    var markets by remember { mutableStateOf<List<MarketTicker>>(emptyList()) }
+    var marketsError by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -52,6 +54,12 @@ fun CryptoHunterApp() {
                 val price = BinanceApi.getBitcoinPrice()
                 btcPrice = price
                 connection = "Επιτυχής σύνδεση Binance"
+                try {
+                    markets = BinanceApi.getTopUsdtMarkets()
+                    marketsError = ""
+                } catch (marketException: Exception) {
+                    marketsError = marketException.message ?: "Αποτυχία φόρτωσης αγορών"
+                }
             } catch (e: Exception) {
                 connection = "Σφάλμα: ${e.message ?: "Άγνωστο σφάλμα"}"
             }
@@ -181,7 +189,31 @@ fun CryptoHunterApp() {
                 }
 
                 "Σήματα" -> {
-                    SignalList(demoSignals)
+                    Text("Top 50 Binance • USDT", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Κατάταξη βάσει όγκου 24ώρου, όχι κεφαλαιοποίησης.", color = Muted, fontSize = 11.sp)
+                    if (marketsError.isNotBlank()) {
+                        Text(marketsError, color = Color(0xFFFFC857), fontSize = 12.sp)
+                    }
+                    if (markets.isEmpty()) {
+                        Text("Δεν υπάρχουν ακόμη δεδομένα αγοράς.", color = Muted)
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(markets) { market ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Panel),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(market.symbol, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text("${market.price} USDT", color = Green)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 else -> {
