@@ -43,17 +43,19 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun CryptoHunterApp() {
     var tab by remember { mutableStateOf("Επισκόπηση") }
-    var btcPrice by remember { mutableStateOf("Φόρτωση...") }
-    var connection by remember { mutableStateOf("Σύνδεση...") }
+    var btcPrice by remember { mutableStateOf("--") }
+    var connection by remember { mutableStateOf("Αναμονή σύνδεσης...") }
 
     LaunchedEffect(Unit) {
         while (true) {
             try {
-                btcPrice = BinanceApi.getBitcoinPrice()
-                connection = "Συνδεδεμένο με Binance"
+                val price = BinanceApi.getBitcoinPrice()
+                btcPrice = price
+                connection = "Επιτυχής σύνδεση Binance"
             } catch (e: Exception) {
-                connection = "Αποτυχία σύνδεσης"
+                connection = "Σφάλμα: ${e.message ?: "Άγνωστο σφάλμα"}"
             }
+
             delay(30_000)
         }
     }
@@ -74,17 +76,31 @@ fun CryptoHunterApp() {
         )
     ) {
         Column(
-            Modifier.fillMaxSize().background(Bg).padding(18.dp)
+            Modifier
+                .fillMaxSize()
+                .background(Bg)
+                .padding(18.dp)
         ) {
-            Text("CRYPTO HUNTER AI", color = Green,
-                fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "CRYPTO HUNTER AI",
+                color = Green,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-            Text("Κυνήγησε ευκαιρίες με κανόνες.",
-                color = Color.White, fontSize = 24.sp,
-                fontWeight = FontWeight.Bold)
+            Text(
+                "Κυνήγησε ευκαιρίες με κανόνες.",
+                color = Color.White,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
 
             Spacer(Modifier.height(8.dp))
-            Text("Spot • Futures • Multi-exchange", color = Muted)
+
+            Text(
+                "Spot • Futures • Multi-exchange",
+                color = Muted
+            )
 
             Spacer(Modifier.height(18.dp))
 
@@ -103,77 +119,147 @@ fun CryptoHunterApp() {
             when (tab) {
                 "Επισκόπηση" -> {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Panel)
+                        colors = CardDefaults.cardColors(
+                            containerColor = Panel
+                        ),
+                        shape = RoundedCornerShape(18.dp)
                     ) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("BITCOIN LIVE PRICE", color = Muted)
+                            Text(
+                                "BITCOIN LIVE PRICE",
+                                color = Muted
+                            )
+
                             Text(
                                 "$$btcPrice USDT",
                                 color = Green,
                                 fontSize = 27.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(connection, color = Muted, fontSize = 12.sp)
-                            Text("Ανανέωση κάθε 30 δευτερόλεπτα",
-                                color = Muted, fontSize = 11.sp)
+
+                            Spacer(Modifier.height(6.dp))
+
+                            Text(
+                                connection,
+                                color = if (
+                                    connection.startsWith("Επιτυχής")
+                                ) Green else Color(0xFFFFC857),
+                                fontSize = 12.sp
+                            )
+
+                            Text(
+                                "Ανανέωση κάθε 30 δευτερόλεπτα",
+                                color = Muted,
+                                fontSize = 11.sp
+                            )
                         }
                     }
 
                     Spacer(Modifier.height(16.dp))
-                    Text("Στρατηγική ανάλυσης",
-                        color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("EMA • RSI • MACD • Όγκος • Support/Resistance",
-                        color = Muted, fontSize = 13.sp)
+
+                    Text(
+                        "Στρατηγική ανάλυσης",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        "EMA • RSI • MACD • Όγκος • Support/Resistance",
+                        color = Muted,
+                        fontSize = 13.sp
+                    )
 
                     Spacer(Modifier.height(16.dp))
-                    Text("Ενδεικτικά σήματα",
-                        color = Color.White, fontWeight = FontWeight.Bold)
+
+                    Text(
+                        "Ενδεικτικά σήματα",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+
                     SignalList(demoSignals)
                 }
 
-                "Σήματα" -> SignalList(demoSignals)
+                "Σήματα" -> {
+                    SignalList(demoSignals)
+                }
 
                 else -> {
-                    Text("Ρυθμίσεις", color = Color.White,
-                        fontWeight = FontWeight.Bold)
+                    Text(
+                        "Ρυθμίσεις",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
                     Text("Αγορές: Spot και Futures", color = Muted)
                     Text("Σύμπαν: Top 50 crypto", color = Muted)
-                    Text("Binance: δημόσια σύνδεση τιμών", color = Muted)
-                    Text("Push notifications: υπό ανάπτυξη", color = Muted)
+                    Text("Binance: Δημόσια δεδομένα τιμών", color = Muted)
+                    Text("Push notifications: Υπό ανάπτυξη", color = Muted)
+                    Text("Γλώσσα: Ελληνικά", color = Muted)
                 }
             }
 
             Spacer(Modifier.weight(1f))
-            Text("Εκπαιδευτικό πρωτότυπο • Όχι επενδυτική συμβουλή",
-                color = Muted, fontSize = 10.sp)
+
+            Text(
+                "Εκπαιδευτικό πρωτότυπο • Όχι επενδυτική συμβουλή",
+                color = Muted,
+                fontSize = 10.sp
+            )
         }
     }
 }
 
 @Composable
 fun SignalList(signals: List<Signal>) {
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         items(signals) { s ->
             Card(
-                colors = CardDefaults.cardColors(containerColor = Panel),
+                colors = CardDefaults.cardColors(
+                    containerColor = Panel
+                ),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(s.symbol, color = Color.White,
-                            fontWeight = FontWeight.Bold)
-                        Text(s.direction,
-                            color = if (s.direction == "BUY") Green
-                            else Color(0xFFFFC857),
-                            fontWeight = FontWeight.Bold)
+                        Text(
+                            s.symbol,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            s.direction,
+                            color = if (s.direction == "BUY")
+                                Green else Color(0xFFFFC857),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Text("${s.venue} • ${s.market} • ${s.timeframe}",
-                        color = Muted, fontSize = 12.sp)
-                    Text("Βαθμολογία: ${s.score}/100 • ${s.status}",
-                        color = Green, fontSize = 12.sp)
+
+                    Spacer(Modifier.height(5.dp))
+
+                    Text(
+                        "${s.venue} • ${s.market} • ${s.timeframe}",
+                        color = Muted,
+                        fontSize = 12.sp
+                    )
+
+                    Text(
+                        "Βαθμολογία: ${s.score}/100 • ${s.status}",
+                        color = Green,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
