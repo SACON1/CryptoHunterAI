@@ -64,15 +64,21 @@ data class Signal(
 
 class MainActivity : ComponentActivity() {
     private val openedSignalSymbol = mutableStateOf<String?>(null)
+    private val openMemeTab = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         openedSignalSymbol.value = intent.getStringExtra(EXTRA_SIGNAL_SYMBOL)
+        openMemeTab.value = intent.getBooleanExtra(EXTRA_OPEN_MEME_TAB, false)
         scheduleBackgroundMarketScan(applicationContext)
+        MemeRadarAlerts.createChannel(applicationContext)
+        scheduleMemeRadarWork(applicationContext)
         setContent {
             CryptoHunterApp(
                 notificationSymbol = openedSignalSymbol.value,
-                onNotificationHandled = { openedSignalSymbol.value = null }
+                onNotificationHandled = { openedSignalSymbol.value = null },
+                openMemeTab = openMemeTab.value,
+                onMemeTabHandled = { openMemeTab.value = false }
             )
         }
     }
@@ -81,15 +87,17 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         openedSignalSymbol.value = intent.getStringExtra(EXTRA_SIGNAL_SYMBOL)
+        openMemeTab.value = intent.getBooleanExtra(EXTRA_OPEN_MEME_TAB, false)
     }
 
     companion object {
         const val EXTRA_SIGNAL_SYMBOL = "crypto_hunter_signal_symbol"
+        const val EXTRA_OPEN_MEME_TAB = "crypto_hunter_open_meme_tab"
     }
 }
 
 @Composable
-fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: () -> Unit = {}) {
+fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: () -> Unit = {}, openMemeTab: Boolean = false, onMemeTabHandled: () -> Unit = {}) {
     val context = LocalContext.current
     var notificationsEnabled by remember { mutableStateOf(SignalNotifications.areNotificationsEnabled(context)) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -98,7 +106,8 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
         if (granted) SignalNotifications.createChannel(context)
         notificationsEnabled = SignalNotifications.areNotificationsEnabled(context)
     }
-    var tab by remember { mutableStateOf("Επισκόπηση") }
+    var tab by remember { mutableStateOf(if (openMemeTab) "Meme Coins" else "Επισκόπηση") }
+    LaunchedEffect(openMemeTab) { if (openMemeTab) { tab = "Meme Coins"; onMemeTabHandled() } }
     var btcPrice by remember { mutableStateOf("--") }
     var connection by remember { mutableStateOf("Αναμονή σύνδεσης...") }
     var markets by remember { mutableStateOf<List<MarketTicker>>(emptyList()) }
