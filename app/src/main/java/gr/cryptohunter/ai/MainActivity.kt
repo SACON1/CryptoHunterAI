@@ -241,6 +241,9 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
                 "Meme Coins" -> {
                     MemeCoinRadarScreen()
                 }
+                "Rug Pull" -> {
+                    RugPullHunterScreen()
+                }
                 "Agent" -> {
                     AgentResearchScreen()
                 }
