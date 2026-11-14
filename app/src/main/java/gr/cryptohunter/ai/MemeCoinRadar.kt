@@ -120,6 +120,15 @@ fun MemeCoinRadarScreen() {
     var error by remember { mutableStateOf("") }
     var refresh by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<MemeCandidate?>(null) }
+    var agentScores by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var agentStatus by remember { mutableStateOf("Οι agents περιμένουν την πρώτη σάρωση.") }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(120_000)
+            if (selected == null && !loading) refresh++
+        }
+    }
 
     LaunchedEffect(refresh) {
         loading = true
@@ -127,6 +136,31 @@ fun MemeCoinRadarScreen() {
         try { scan = scanMemeCoins() }
         catch (e: Exception) { error = e.message ?: "Αποτυχία σύνδεσης" }
         finally { loading = false }
+    }
+
+    LaunchedEffect(scan?.checkedAt) {
+        val current = scan ?: return@LaunchedEffect
+        agentStatus = "Οι agents αξιολογούν τις καλύτερες υποψηφιότητες..."
+        val scores = mutableMapOf<String, Int>()
+        for (coin in current.coins.take(5)) {
+            try {
+                val report = runMemeAgentCouncil(coin)
+                val key = coin.chain + ":" + coin.address
+                scores[key] = if (report.blocked) 0 else report.score
+                if (!report.blocked && report.score >= 75) {
+                    val prefs = context.getSharedPreferences("meme_radar_alerts", android.content.Context.MODE_PRIVATE)
+                    val last = prefs.getLong(key, 0L)
+                    if (System.currentTimeMillis() - last >= 12 * 60 * 60 * 1000L) {
+                        MemeRadarAlerts.notify(context, coin, report.score, report.verdict)
+                        prefs.edit().putLong(key, System.currentTimeMillis()).apply()
+                    }
+                }
+            } catch (_: Exception) {
+                scores[coin.chain + ":" + coin.address] = 0
+            }
+        }
+        agentScores = scores
+        agentStatus = "Αξιολογήθηκαν ${scores.size} υποψήφια • αυτόματη επανάληψη σε 2 λεπτά."
     }
 
     if (selected != null) {
@@ -173,7 +207,8 @@ fun MemeCoinRadarScreen() {
             }
             Text(if (loading) "● SCANNING" else "● RADAR", color = if (loading) Color(0xFFFFC857) else Color(0xFF42E6B0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
-        Text("Νέα token profiles και boosts από DexScreener • ταξινόμηση βάσει όγκου", color = Color(0xFFA7B4D0), fontSize = 11.sp)
+        Text("Αυτόματη σάρωση ανά 2 λεπτά • DexScreener • αξιολόγηση agents", color = Color(0xFFA7B4D0), fontSize = 11.sp)
+        Text(agentStatus, color = Color(0xFF45D9FF), fontSize = 10.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { refresh++ }, enabled = !loading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B75FF))) {
                 Text(if (loading) "Σάρωση..." else "↻ Σάρωση τώρα")
@@ -184,7 +219,7 @@ fun MemeCoinRadarScreen() {
         if (error.isNotBlank()) Text("Σφάλμα: $error", color = Color(0xFFFFC857), fontSize = 11.sp)
         Text("ΠΡΟΣΟΧΗ: Τα boosts είναι πληρωμένες προωθήσεις. Η εμφάνιση εδώ δεν σημαίνει ότι ένα coin είναι legit ή ασφαλές.", color = Color(0xFFFFC857), fontSize = 11.sp)
         if (scan?.coins.isNullOrEmpty() && !loading) Text("Δεν βρέθηκαν νέα ζεύγη από τις διαθέσιμες πηγές αυτή τη στιγμή.", color = Color.White)
-        scan?.coins?.forEach { coin ->
+        scan?.coins?.sortedByDescending { agentScores[it.chain + ":" + it.address] ?: -1 }?.forEach { coin ->
             val flags = (if (coin.liquidity < 10000) 1 else 0) +
                 (if (coin.volume24h < 5000) 1 else 0) +
                 (if (coin.ageHours != null && coin.ageHours < 24) 1 else 0) +
@@ -208,7 +243,10 @@ fun MemeCoinRadarScreen() {
                     Text("Vol ${usdShort(coin.volume24h)}", color = Color.White, fontSize = 11.sp)
                     Text("${String.format(Locale.US, "%.1f", coin.change24h)}%", color = if (coin.change24h >= 0) Color(0xFF42E6B0) else Color(0xFFFF7185), fontSize = 11.sp)
                 }
-                Text("Το risk label είναι μόνο αρχικός έλεγχος αγοράς, όχι έλεγχος scam.", color = Color(0xFFA7B4D0), fontSize = 9.sp)
+                agentScores[coin.chain + ":" + coin.address]?.let { score ->
+                    Text("Agent score: $score/100", color = if (score >= 75) Color(0xFF42E6B0) else Color(0xFFA7B4D0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                } ?: Text("Οι agents αξιολογούν...", color = Color(0xFFA7B4D0), fontSize = 9.sp)
+                Text("Το αρχικό risk label δεν αποτελεί απόδειξη ότι ένα token είναι ασφαλές.", color = Color(0xFFA7B4D0), fontSize = 9.sp)
                 TextButton(onClick = { selected = coin }) { Text("Πλήρης εικόνα & red flags  →", color = Color(0xFF45D9FF)) }
             }
         }
