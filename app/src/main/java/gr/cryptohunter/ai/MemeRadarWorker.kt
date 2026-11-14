@@ -51,7 +51,7 @@ object MemeRadarAlerts {
         }
     }
 
-    fun notify(context: Context, coin: MemeCandidate, score: Int, verdict: String) {
+    internal fun notify(context: Context, coin: MemeCandidate, score: Int, verdict: String) {
         if (Build.VERSION.SDK_INT >= 33 &&
             androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
