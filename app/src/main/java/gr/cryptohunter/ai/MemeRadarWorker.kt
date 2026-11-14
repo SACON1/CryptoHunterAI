@@ -21,7 +21,7 @@ class MemeRadarWorker(context: Context, params: WorkerParameters) : CoroutineWor
             SignalNotifications.createChannel(applicationContext)
             val scan = scanMemeCoins()
             val prefs = applicationContext.getSharedPreferences("meme_radar_alerts", Context.MODE_PRIVATE)
-            for (coin in scan.coins) {
+            for (coin in scan.coins.take(8)) {
                 val report = runMemeAgentCouncil(coin)
                 if (report.blocked || report.score < 75) continue
                 val key = "${coin.chain}:${coin.address}"
