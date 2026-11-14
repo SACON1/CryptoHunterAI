@@ -2,7 +2,6 @@ package gr.cryptohunter.ai
 
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
 
 data class Candle(
     val open: Double,
@@ -21,7 +20,8 @@ data class TechnicalSignal(
     val explanation: String,
     val stopLoss: Double?,
     val takeProfit: Double?,
-    val riskReward: Double?
+    val riskReward: Double?,
+    val indicatorDetails: List<Pair<String, String>> = emptyList()
 )
 
 object TechnicalAnalysis {
@@ -108,8 +108,16 @@ object TechnicalAnalysis {
             "SELL" -> "SELL: επιβεβαιώθηκαν score, EMA και MACD"
             else -> "WAIT • Για BUY: ${buyMissing.joinToString(", ")} • Για SELL: ${sellMissing.joinToString(", ")}"
         }
+        val details = listOf(
+            "EMA 20/50" to "Τι είναι: εκθετικοί κινητοί μέσοι που δείχνουν την κατεύθυνση της τάσης. Τώρα: EMA20 ${fmt(ema20)}, EMA50 ${fmt(ema50)}, τιμή ${fmt(last)}. ${when { last > ema20 && ema20 > ema50 -> "Θετική διάταξη, ενισχύει την ανοδική τάση."; last < ema20 && ema20 < ema50 -> "Αρνητική διάταξη, δείχνει καθοδική τάση."; else -> "Οι μέσοι δεν έχουν πλήρη ανοδική ή καθοδική συμφωνία." }}",
+            "RSI 14" to "Τι είναι: δείκτης ορμής από 0 έως 100. Τώρα: ${fmt(rsi)}. Συνήθως πάνω από 70 θεωρείται υπεραγορασμένο και κάτω από 30 υπερπουλημένο· εδώ η ζώνη 50–68 βαθμολογείται θετικά χωρίς να αποτελεί μόνη της σήμα.",
+            "MACD" to "Τι είναι: συγκρίνει εκθετικούς μέσους για να εκτιμήσει ορμή και αλλαγή τάσης. Τώρα: ${if (macdLine > macdSignal) "η γραμμή MACD είναι πάνω από τη γραμμή σήματος" else "η γραμμή MACD είναι κάτω από τη γραμμή σήματος"} και ${if (macdLine > 0) "πάνω από το μηδέν" else "κάτω από το μηδέν"}.",
+            "Όγκος" to "Τι είναι: μετρά τη δραστηριότητα συναλλαγών σε σχέση με τον πρόσφατο μέσο όρο. Τώρα: ${fmt(volumeRatio)}x του μέσου όγκου 20 κεριών. Μεγαλύτερος όγκος μπορεί να επιβεβαιώσει μια κίνηση, όχι όμως να εγγυηθεί συνέχειά της.",
+            "Στήριξη / Αντίσταση" to "Τι είναι: πρόσφατες ζώνες όπου η τιμή έχει βρει αγοραστές ή πωλητές. Στο τελευταίο παράθυρο 20 κεριών: στήριξη περίπου ${fmt(support)}, αντίσταση περίπου ${fmt(resistance)}. Είναι ενδεικτικά επίπεδα, όχι εγγυημένα όρια.",
+            "ATR 14" to "Τι είναι: μέσο πραγματικό εύρος, δηλαδή μέτρο μεταβλητότητας και όχι κατεύθυνσης. Τώρα: ${fmt(atr)}. Χρησιμοποιείται από το πρωτότυπο για ενδεικτικό Stop Loss 1.5×ATR και Take Profit 3×ATR όταν υπάρχει BUY ή SELL."
+        )
         val explanation = "$decisionNote\nEMA20 ${fmt(ema20)} • EMA50 ${fmt(ema50)} • RSI ${fmt(rsi)} • MACD ${if (macdLine > macdSignal) "θετικό" else "αρνητικό"} • Όγκος ${fmt(volumeRatio)}x"
-        return TechnicalSignal(symbol, direction, score, last, "1H", explanation, stopLoss, takeProfit, riskReward)
+        return TechnicalSignal(symbol, direction, score, last, "1H", explanation, stopLoss, takeProfit, riskReward, details)
     }
 
     private fun ema(values: List<Double>, period: Int): Double {
@@ -132,14 +140,11 @@ object TechnicalAnalysis {
 
     private fun atr(candles: List<Candle>, period: Int): Double {
         val ranges = candles.zipWithNext().map { (previous, current) ->
-            max(
-                current.high - current.low,
-                max(abs(current.high - previous.close), abs(current.low - previous.close))
-            )
+            max(current.high - current.low, max(abs(current.high - previous.close), abs(current.low - previous.close)))
         }
         return ranges.takeLast(period).average().takeIf { it.isFinite() && it > 0.0 }
             ?: candles.last().close * 0.01
     }
 
-    private fun fmt(value: Double): String = String.format(java.util.Locale.US, "%.2f", value)
+    private fun fmt(value: Double): String = String.format(java.util.Locale.US, "%.6f", value)
 }
