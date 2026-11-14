@@ -113,13 +113,6 @@ internal suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport
         )
     }
 
-    votes += MemeAgentVote(
-        "News & Social Agent",
-        "ΑΝΑΜΟΝΗ ΣΥΝΔΕΣΗΣ",
-        "Δεν έχει συνδεθεί ακόμη αξιόπιστη live ροή ειδήσεων και social sentiment. Δεν προσμετράται θετικό news score.",
-        null
-    )
-
     try {
         val pulse = MemeNewsSocialAgent.analyze(coin)
         val newsDetail = if (pulse.score == null) {
