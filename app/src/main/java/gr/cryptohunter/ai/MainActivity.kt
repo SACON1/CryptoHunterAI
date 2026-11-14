@@ -82,12 +82,6 @@ fun CryptoHunterApp() {
         }
     }
 
-    val demoSignals = listOf(
-        Signal("BTC/USDT", "Binance", "Spot", "BUY", 86, "4H", "ΔΕΙΓΜΑ"),
-        Signal("ETH/USDT", "OKX", "Futures", "WAIT", 72, "1H", "ΔΕΙΓΜΑ"),
-        Signal("SOL/USDT", "Bybit", "Spot", "BUY", 81, "15m", "ΔΕΙΓΜΑ")
-    )
-
     MaterialTheme(
         colorScheme = darkColorScheme(background = Bg, surface = Panel, primary = Green, onBackground = Color.White, onSurface = Color.White)
     ) {
@@ -109,7 +103,12 @@ fun CryptoHunterApp() {
                     Text("CRYPTO HUNTER", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
                     Text("AI  •  SMART MARKET RADAR", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
-                Text("● LIVE", color = Green, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (connection.startsWith("Επιτυχής")) "● LIVE" else "● OFFLINE",
+                    color = if (connection.startsWith("Επιτυχής")) Green else Color(0xFFFFC857),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
             Spacer(Modifier.height(22.dp))
             Text("Η αγορά, με", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.Bold)
@@ -156,13 +155,27 @@ fun CryptoHunterApp() {
                     Text("EMA 20/50  •  RSI 14  •  MACD  •  Volume  •  ATR", color = Muted, fontSize = 12.sp)
                     Spacer(Modifier.height(18.dp))
                     SectionTitle("Σήματα αγοράς", scanStatus)
-                    if (technicalSignals.isNotEmpty()) TechnicalSignalList(technicalSignals.take(8)) else SignalList(demoSignals)
+                    if (technicalSignals.isNotEmpty()) {
+                        TechnicalSignalList(technicalSignals.take(8))
+                    } else {
+                        GlassCard(accent = Violet, compact = true) {
+                            Text("Δεν υπάρχουν ακόμη επιβεβαιωμένα τεχνικά σήματα.", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text("Τα σήματα θα εμφανιστούν μόλις ολοκληρωθεί επιτυχώς η ανάλυση δεδομένων.", color = Muted, fontSize = 11.sp)
+                        }
+                    }
                 }
                 "Σήματα" -> {
                     SectionTitle("Τεχνικά σήματα", "TOP 10 • BINANCE • 1H")
                     Text(scanStatus, color = Muted, fontSize = 11.sp)
                     Spacer(Modifier.height(10.dp))
-                    if (technicalSignals.isNotEmpty()) TechnicalSignalList(technicalSignals) else SignalList(demoSignals)
+                    if (technicalSignals.isNotEmpty()) {
+                        TechnicalSignalList(technicalSignals)
+                    } else {
+                        GlassCard(accent = Violet, compact = true) {
+                            Text("Δεν υπάρχουν ακόμη επιβεβαιωμένα τεχνικά σήματα.", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text("Έλεγξε τη σύνδεση και δοκίμασε ξανά σε λίγο.", color = Muted, fontSize = 11.sp)
+                        }
+                    }
                     Spacer(Modifier.height(16.dp))
                     SectionTitle("Αγορές Top 50", "Κατάταξη βάσει όγκου 24ώρου")
                     if (marketsError.isNotBlank()) Text(marketsError, color = Color(0xFFFFC857), fontSize = 12.sp)
