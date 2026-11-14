@@ -341,7 +341,7 @@ private fun scheduleBackgroundMarketScan(context: Context) {
         )
         .build()
 
-    WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
+    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
         "crypto_hunter_background_scan",
         ExistingPeriodicWorkPolicy.KEEP,
         request
