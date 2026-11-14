@@ -339,7 +339,7 @@ fun TechnicalSignalList(signals: List<TechnicalSignal>, onOpen: (TechnicalSignal
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(Modifier.weight(1f)) {
                         Text(signal.symbol, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text("\${signal.timeframe} • Βαθμολογία \${signal.score}/100", color = Muted, fontSize = 11.sp)
+                        Text("${signal.timeframe} • Βαθμολογία ${signal.score}/100", color = Muted, fontSize = 11.sp)
                     }
                     Text(signal.direction, color = if (signal.direction == "BUY") Green else if (signal.direction == "SELL") Color(0xFFFF6677) else Color(0xFFFFC857), fontWeight = FontWeight.ExtraBold)
                 }
@@ -373,13 +373,13 @@ private fun SignalDetailScreen(signal: TechnicalSignal, onBack: () -> Unit) {
                 Text("ΑΠΟΤΕΛΕΣΜΑ", color = Muted)
                 Text(signal.direction, color = if (signal.direction == "BUY") Green else if (signal.direction == "SELL") Color(0xFFFF6677) else Color(0xFFFFC857), fontWeight = FontWeight.Bold)
             }
-            Text("\${signal.score}/100", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
-            Text("Χρονικό πλαίσιο: \${signal.timeframe}", color = Muted)
+            Text("${signal.score}/100", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Χρονικό πλαίσιο: ${signal.timeframe}", color = Muted)
             Divider(color = Color.White.copy(alpha = 0.12f))
-            Text("Τιμή αναφοράς: \${signal.price}", color = Green)
+            Text("Τιμή αναφοράς: ${signal.price}", color = Green)
             signal.stopLoss?.let { Text("Stop Loss: $it", color = Color(0xFFFF6677)) }
             signal.takeProfit?.let { Text("Take Profit: $it", color = Green) }
-            signal.riskReward?.let { Text("Risk / Reward: 1:\${String.format(java.util.Locale.US, "%.1f", it)}", color = Color(0xFFFFC857)) }
+            signal.riskReward?.let { Text("Risk / Reward: 1:${String.format(java.util.Locale.US, "%.1f", it)}", color = Color(0xFFFFC857)) }
             Text("Ενδεικτικά επίπεδα — όχι εντολή αγοράς.", color = Muted, fontSize = 10.sp)
         }
         Spacer(Modifier.height(18.dp))
@@ -403,8 +403,8 @@ private fun SignalDetailScreen(signal: TechnicalSignal, onBack: () -> Unit) {
                     status = "Αναζήτηση..."
                     try {
                         contracts = TokenContractApi.lookup(signal.symbol)
-                        status = if (contracts.isEmpty()) "Δεν βρέθηκε καταχώριση. Μην αγοράσεις με μη επαληθευμένη διεύθυνση." else "Βρέθηκαν \${contracts.size} καταχωρίσεις — επιβεβαίωσε το δίκτυο και το token."
-                    } catch (e: Exception) { status = "Σφάλμα: \${e.message ?: "δοκίμασε ξανά"}" }
+                        status = if (contracts.isEmpty()) "Δεν βρέθηκε καταχώριση. Μην αγοράσεις με μη επαληθευμένη διεύθυνση." else "Βρέθηκαν ${contracts.size} καταχωρίσεις — επιβεβαίωσε το δίκτυο και το token."
+                    } catch (e: Exception) { status = "Σφάλμα: ${e.message ?: "δοκίμασε ξανά"}" }
                     loading = false
                 }
             }, enabled = !loading, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Violet)) {
