@@ -1,0 +1,147 @@
+package gr.cryptohunter.ai
+
+import android.content.Intent
+import android.net.Uri
+import android.util.Xml
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.xmlpull.v1.XmlPullParser
+import java.net.HttpURLConnection
+import java.net.URL
+
+private data class AgentItem(val title:String,val source:String,val url:String,val summary:String,val category:String)
+private data class AgentData(val tokens:List<AgentItem>,val boosts:List<AgentItem>,val social:List<AgentItem>,val news:List<AgentItem>,val time:String)
+
+private fun agentGet(url:String):String {
+    val c=URL(url).openConnection() as HttpURLConnection
+    c.connectTimeout=12000; c.readTimeout=12000
+    c.setRequestProperty("User-Agent","CryptoHunterAI/0.2 Android")
+    c.setRequestProperty("Accept","application/json, application/rss+xml, application/xml, text/xml")
+    return try { c.inputStream.bufferedReader().use{it.readText()} } finally { c.disconnect() }
+}
+
+private fun agentRss(xml:String,source:String,category:String):List<AgentItem> {
+    val p=Xml.newPullParser(); p.setInput(xml.reader())
+    val out=mutableListOf<AgentItem>(); var event=p.eventType
+    var active=false; var title=""; var link=""; var desc=""; var itemDepth=0
+    while(event!=XmlPullParser.END_DOCUMENT && out.size<15) {
+        when(event) {
+            XmlPullParser.START_TAG -> {
+                val tag=p.name.lowercase()
+                if(tag=="item" || tag=="entry") { active=true; title=""; link=""; desc=""; itemDepth=p.depth }
+                else if(active && tag=="title") title=p.nextText().trim()
+                else if(active && tag in listOf("description","summary","content")) desc=p.nextText().replace(Regex("<[^>]*>")," ").trim()
+                else if(active && tag=="link") link=(p.getAttributeValue(null,"href") ?: p.nextText()).trim()
+            }
+            XmlPullParser.END_TAG -> if(active && p.name.lowercase() in listOf("item","entry") && p.depth==itemDepth) {
+                if(title.isNotBlank()) out.add(AgentItem(title,source,link,desc.take(200),category))
+                active=false
+            }
+        }
+        event=p.next()
+    }
+    return out
+}
+
+private suspend fun fetchAgentData():AgentData=withContext(Dispatchers.IO) {
+    val tokens=runCatching {
+        val a=JSONArray(agentGet("https://api.dexscreener.com/token-profiles/latest/v1"))
+        (0 until minOf(a.length(),20)).mapNotNull { i ->
+            val o=a.optJSONObject(i) ?: return@mapNotNull null
+            val addr=o.optString("tokenAddress"); val chain=o.optString("chainId")
+            if(addr.isBlank() || chain.isBlank()) null else AgentItem("Νέο token profile • $chain","DexScreener",o.optString("url"),"Address: $addr • ${o.optString("description","Χωρίς περιγραφή").take(100)}","TOKEN")
+        }
+    }.getOrDefault(emptyList())
+    val boosts=runCatching {
+        val a=JSONArray(agentGet("https://api.dexscreener.com/token-boosts/latest/v1"))
+        (0 until minOf(a.length(),15)).mapNotNull { i ->
+            val o=a.optJSONObject(i) ?: return@mapNotNull null
+            val addr=o.optString("tokenAddress"); val link=o.optString("url")
+            if(addr.isBlank() || link.isBlank()) null else AgentItem("Προωθημένο token • ${o.optString("chainId")}","DexScreener Boosts",link,"Boost: ${o.optString("amount","—")} • $addr. Η πληρωμένη προώθηση δεν είναι ένδειξη αξιοπιστίας.","BOOST")
+        }
+    }.getOrDefault(emptyList())
+    val socialFeeds=listOf("https://www.reddit.com/r/CryptoCurrency/.rss","https://www.reddit.com/r/solana/.rss","https://www.reddit.com/r/memecoins/.rss")
+    val social=socialFeeds.flatMapIndexed { i,url -> runCatching { agentRss(agentGet(url),listOf("r/CryptoCurrency","r/solana","r/memecoins")[i],"SOCIAL") }.getOrDefault(emptyList()) }.take(25)
+    val newsFeeds=listOf("https://cointelegraph.com/rss","https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml","https://www.theblock.co/rss.xml")
+    val news=newsFeeds.flatMapIndexed { i,url -> runCatching { agentRss(agentGet(url),listOf("Cointelegraph","CoinDesk","The Block")[i],"NEWS") }.getOrDefault(emptyList()) }.take(30)
+    AgentData(tokens,boosts,social,news,java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.getDefault()).format(java.util.Date()))
+}
+
+private fun agentMood(text:String):Pair<String,Color> {
+    val s=text.lowercase()
+    val pos=listOf("bullish","breakout","surge","partnership","adoption","launch","listing","growth").count{s.contains(it)}
+    val neg=listOf("scam","rug","hack","exploit","dump","fraud","warning","lawsuit","crash").count{s.contains(it)}
+    return when { pos>neg -> "Θετικό λεξιλόγιο • όχι πρόβλεψη" to Color(0xFF42E6B0); neg>pos -> "Αρνητικό λεξιλόγιο • προσοχή" to Color(0xFFFF7185); else -> "Μικτό / ουδέτερο" to Color(0xFFFFC857) }
+}
+
+@Composable
+fun AgentResearchScreen() {
+    val context=LocalContext.current
+    var data by remember { mutableStateOf<AgentData?>(null) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    var tab by remember { mutableStateOf("SOCIAL") }
+    var refresh by remember { mutableIntStateOf(0) }
+    LaunchedEffect(refresh) {
+        loading=true; error=""
+        try { data=fetchAgentData(); if(data!!.tokens.isEmpty() && data!!.social.isEmpty() && data!!.news.isEmpty()) error="Οι πηγές δεν απάντησαν." }
+        catch(e:Exception) { error=e.message ?: "Σφάλμα σύνδεσης" }
+        finally { loading=false }
+    }
+    LaunchedEffect(Unit) { while(true) { delay(5*60*1000L); refresh++ } }
+    val list=when(tab) { "SOCIAL"->data?.social.orEmpty(); "NEWS"->data?.news.orEmpty(); "TOKENS"->data?.tokens.orEmpty(); else->data?.boosts.orEmpty() }
+    Column(verticalArrangement=Arrangement.spacedBy(11.dp)) {
+        Text("CRYPTO HUNTER • LIVE AGENT",color=Color(0xFF45D9FF),fontSize=10.sp,fontWeight=FontWeight.Bold)
+        Text("Ο ερευνητής της αγοράς σου.",color=Color.White,fontSize=21.sp,fontWeight=FontWeight.ExtraBold)
+        Text("Συζητήσεις • Ειδήσεις • Νέα tokens • Προωθήσεις",color=Color(0xFFA7B4D0),fontSize=11.sp)
+        Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xD91D2945),Color(0xB3101830))),RoundedCornerShape(18.dp)).border(1.dp,Color(0x669B75FF),RoundedCornerShape(18.dp)).padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                Text("AGENT STATUS",color=Color(0xFFA7B4D0),fontSize=10.sp,fontWeight=FontWeight.Bold)
+                Text(if(loading)"● SCANNING" else if(data!=null)"● CONNECTED" else "● WAITING",color=if(loading)Color(0xFFFFC857) else Color(0xFF42E6B0),fontSize=10.sp,fontWeight=FontWeight.Bold)
+            }
+            if(loading) LinearProgressIndicator(Modifier.fillMaxWidth(),color=Color(0xFF9B75FF))
+            Text("DexScreener • Reddit RSS • Crypto news RSS",color=Color.White,fontSize=11.sp)
+            Text("Τελευταίος έλεγχος: ${data?.time ?: "—"} • ανανέωση ανά 5 λεπτά όταν είναι ανοιχτή η καρτέλα",color=Color(0xFFA7B4D0),fontSize=9.sp)
+            TextButton(onClick={refresh++}) { Text("↻ Σάρωση τώρα",color=Color(0xFF45D9FF)) }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            listOf("SOCIAL","NEWS","TOKENS","BOOSTS").forEach { key ->
+                FilterChip(selected=tab==key,onClick={tab=key},label={Text(when(key){"SOCIAL"->"Social";"NEWS"->"News";"TOKENS"->"New";else->"Boosts"},fontSize=9.sp)})
+            }
+        }
+        if(error.isNotBlank()) Text(error,color=Color(0xFFFFC857),fontSize=11.sp)
+        if(tab=="SOCIAL") Text("Δημόσιες συζητήσεις Reddit μέσω RSS. Η ένδειξη κλίματος είναι απλή ανάλυση λέξεων, όχι AI πρόβλεψη.",color=Color(0xFFA7B4D0),fontSize=10.sp)
+        if(tab=="BOOSTS") Text("Τα boosts είναι πληρωμένη προβολή — όχι απόδειξη ποιότητας ή ασφάλειας.",color=Color(0xFFFFC857),fontSize=10.sp)
+        if(list.isEmpty() && !loading) Text("Δεν υπάρχουν διαθέσιμα αποτελέσματα αυτή τη στιγμή.",color=Color(0xFFA7B4D0),fontSize=12.sp)
+        list.forEach { item ->
+            val mood=agentMood(item.title+" "+item.summary)
+            Column(Modifier.fillMaxWidth().background(Color(0xCC17213A),RoundedCornerShape(16.dp)).border(1.dp,Color(0x339B75FF),RoundedCornerShape(16.dp)).padding(13.dp)) {
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                    Text(item.source.uppercase(),color=Color(0xFF45D9FF),fontSize=9.sp,fontWeight=FontWeight.Bold)
+                    Text(item.category,color=Color(0xFFA7B4D0),fontSize=8.sp)
+                }
+                Spacer(Modifier.height(5.dp))
+                Text(item.title,color=Color.White,fontSize=13.sp,fontWeight=FontWeight.SemiBold)
+                if(item.summary.isNotBlank()) Text(item.summary,color=Color(0xFFA7B4D0),fontSize=10.sp,maxLines=3)
+                if(tab=="SOCIAL" || tab=="NEWS") Text(mood.first,color=mood.second,fontSize=9.sp)
+                if(item.url.startsWith("https://")) TextButton(onClick={context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(item.url)))}) { Text("Άνοιγμα πηγής ↗",color=Color(0xFF42E6B0),fontSize=10.sp) }
+            }
+        }
+        Text("Το X δεν έχει συνδεθεί ακόμη: απαιτείται επίσημη πρόσβαση API. Για επίσημη και σταθερή πρόσβαση στο Reddit χρειάζεται εγκεκριμένο OAuth. Δεν υπάρχει ακόμη LLM ανάλυση, background cloud agent ή αυτόματη αγορά.",color=Color(0xFFA7B4D0),fontSize=10.sp)
+    }
+}
