@@ -47,6 +47,8 @@ fun CryptoHunterApp() {
     var connection by remember { mutableStateOf("Αναμονή σύνδεσης...") }
     var markets by remember { mutableStateOf<List<MarketTicker>>(emptyList()) }
     var marketsError by remember { mutableStateOf("") }
+    var technicalSignals by remember { mutableStateOf<List<TechnicalSignal>>(emptyList()) }
+    var scanStatus by remember { mutableStateOf("Η τεχνική ανάλυση δεν έχει ξεκινήσει.") }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -57,8 +59,12 @@ fun CryptoHunterApp() {
                 try {
                     markets = BinanceApi.getTopUsdtMarkets()
                     marketsError = ""
+                    scanStatus = "Ανάλυση EMA, RSI, MACD και όγκου..."
+                    technicalSignals = BinanceTechnicalApi.scan(markets.take(10).map { it.symbol })
+                    scanStatus = "Ολοκληρώθηκε ανάλυση ${technicalSignals.size} αγορών • 1H"
                 } catch (marketException: Exception) {
                     marketsError = marketException.message ?: "Αποτυχία φόρτωσης αγορών"
+                    scanStatus = "Δεν ήταν δυνατή η ανάλυση αγοράς."
                 }
             } catch (e: Exception) {
                 connection = "Σφάλμα: ${e.message ?: "Άγνωστο σφάλμα"}"
@@ -185,10 +191,17 @@ fun CryptoHunterApp() {
                         fontWeight = FontWeight.Bold
                     )
 
-                    SignalList(demoSignals)
+                    Text(scanStatus, color = Muted, fontSize = 11.sp)
+                    Spacer(Modifier.height(8.dp))
+                    if (technicalSignals.isNotEmpty()) TechnicalSignalList(technicalSignals)
+                    else SignalList(demoSignals)
                 }
 
                 "Σήματα" -> {
+                    Text("Πραγματική τεχνική ανάλυση • Top 10", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(scanStatus, color = Muted, fontSize = 11.sp)
+                    if (technicalSignals.isNotEmpty()) TechnicalSignalList(technicalSignals)
+                    Spacer(Modifier.height(12.dp))
                     Text("Top 50 Binance • USDT", color = Color.White, fontWeight = FontWeight.Bold)
                     Text("Κατάταξη βάσει όγκου 24ώρου, όχι κεφαλαιοποίησης.", color = Muted, fontSize = 11.sp)
                     if (marketsError.isNotBlank()) {
@@ -292,6 +305,29 @@ fun SignalList(signals: List<Signal>) {
                         color = Green,
                         fontSize = 12.sp
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TechnicalSignalList(signals: List<TechnicalSignal>) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(signals) { signal ->
+            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
+                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(signal.symbol, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(signal.direction, color = when (signal.direction) {
+                            "BUY" -> Green
+                            "SELL" -> Color(0xFFFF6677)
+                            else -> Color(0xFFFFC857)
+                        }, fontWeight = FontWeight.Bold)
+                    }
+                    Text("Βαθμολογία ${signal.score}/100 • ${signal.timeframe}", color = Muted, fontSize = 12.sp)
+                    Text("Τιμή: ${signal.price}", color = Green, fontSize = 12.sp)
+                    Text(signal.explanation, color = Muted, fontSize = 11.sp)
                 }
             }
         }
