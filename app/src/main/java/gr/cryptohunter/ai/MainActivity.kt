@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun CryptoHunterApp() {
     val context = LocalContext.current
+    var notificationsEnabled by remember { mutableStateOf(SignalNotifications.areNotificationsEnabled(context)) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -86,7 +87,6 @@ fun CryptoHunterApp() {
     var marketsError by remember { mutableStateOf("") }
     var technicalSignals by remember { mutableStateOf<List<TechnicalSignal>>(emptyList()) }
     var scanStatus by remember { mutableStateOf("Η τεχνική ανάλυση δεν έχει ξεκινήσει.") }
-    var notificationsEnabled by remember { mutableStateOf(SignalNotifications.areNotificationsEnabled(context)) }
     LaunchedEffect(tab) { notificationsEnabled = SignalNotifications.areNotificationsEnabled(context) }
     val pulse = rememberInfiniteTransition(label = "live-pulse")
     val liveAlpha by pulse.animateFloat(0.45f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "live-alpha")
