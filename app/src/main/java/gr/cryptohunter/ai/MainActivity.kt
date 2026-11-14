@@ -3,9 +3,11 @@ package gr.cryptohunter.ai
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +72,7 @@ fun CryptoHunterApp() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) SignalNotifications.createChannel(context)
+        notificationsEnabled = SignalNotifications.areNotificationsEnabled(context)
     }
     var tab by remember { mutableStateOf("Επισκόπηση") }
     var btcPrice by remember { mutableStateOf("--") }
@@ -78,6 +81,8 @@ fun CryptoHunterApp() {
     var marketsError by remember { mutableStateOf("") }
     var technicalSignals by remember { mutableStateOf<List<TechnicalSignal>>(emptyList()) }
     var scanStatus by remember { mutableStateOf("Η τεχνική ανάλυση δεν έχει ξεκινήσει.") }
+    var notificationsEnabled by remember { mutableStateOf(SignalNotifications.areNotificationsEnabled(context)) }
+    LaunchedEffect(tab) { notificationsEnabled = SignalNotifications.areNotificationsEnabled(context) }
 
     LaunchedEffect(Unit) {
         SignalNotifications.createChannel(context)
