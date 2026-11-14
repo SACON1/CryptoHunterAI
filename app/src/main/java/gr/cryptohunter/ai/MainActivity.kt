@@ -88,6 +88,7 @@ fun CryptoHunterApp() {
     var marketsError by remember { mutableStateOf("") }
     var technicalSignals by remember { mutableStateOf<List<TechnicalSignal>>(emptyList()) }
     var scanStatus by remember { mutableStateOf("Η τεχνική ανάλυση δεν έχει ξεκινήσει.") }
+    var selectedSignal by remember { mutableStateOf<TechnicalSignal?>(null) }
     LaunchedEffect(tab) { notificationsEnabled = SignalNotifications.areNotificationsEnabled(context) }
     val pulse = rememberInfiniteTransition(label = "live-pulse")
     val liveAlpha by pulse.animateFloat(0.45f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "live-alpha")
@@ -128,6 +129,9 @@ fun CryptoHunterApp() {
     MaterialTheme(
         colorScheme = darkColorScheme(background = Bg, surface = Panel, primary = Green, onBackground = Color.White, onSurface = Color.White)
     ) {
+        if (selectedSignal != null) {
+            SignalDetailScreen(selectedSignal!!, onBack = { selectedSignal = null })
+        } else {
         Column(
             Modifier.fillMaxSize()
                 .background(Brush.verticalGradient(listOf(Color(0xFF111A35), Bg, Color(0xFF080B17))))
@@ -199,7 +203,7 @@ fun CryptoHunterApp() {
                     Spacer(Modifier.height(18.dp))
                     SectionTitle("Σήματα αγοράς", scanStatus)
                     if (technicalSignals.isNotEmpty()) {
-                        TechnicalSignalList(technicalSignals.take(8))
+                        TechnicalSignalList(technicalSignals.take(8), onOpen = { selectedSignal = it })
                     } else {
                         GlassCard(accent = Violet, compact = true) {
                             Text("Δεν υπάρχουν ακόμη επιβεβαιωμένα τεχνικά σήματα.", color = Color.White, fontWeight = FontWeight.SemiBold)
@@ -212,7 +216,7 @@ fun CryptoHunterApp() {
                     Text(scanStatus, color = Muted, fontSize = 11.sp)
                     Spacer(Modifier.height(10.dp))
                     if (technicalSignals.isNotEmpty()) {
-                        TechnicalSignalList(technicalSignals)
+                        TechnicalSignalList(technicalSignals, onOpen = { selectedSignal = it })
                     } else {
                         GlassCard(accent = Violet, compact = true) {
                             Text("Δεν υπάρχουν ακόμη επιβεβαιωμένα τεχνικά σήματα.", color = Color.White, fontWeight = FontWeight.SemiBold)
@@ -272,6 +276,7 @@ fun CryptoHunterApp() {
             Text("CRYPTO HUNTER AI  •  Εκπαιδευτικό εργαλείο — όχι επενδυτική συμβουλή", color = Muted, fontSize = 9.sp)
             Spacer(Modifier.height(8.dp))
         }
+        }
     }
 }
 
@@ -327,97 +332,107 @@ fun SignalList(signals: List<Signal>) {
 }
 
 @Composable
-fun TechnicalSignalList(signals: List<TechnicalSignal>) {
-    val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+fun TechnicalSignalList(signals: List<TechnicalSignal>, onOpen: (TechnicalSignal) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         signals.forEach { signal ->
-            var detailsOpen by remember(signal.symbol) { mutableStateOf(false) }
-            var contracts by remember(signal.symbol) { mutableStateOf<List<TokenContract>>(emptyList()) }
-            var contractStatus by remember(signal.symbol) { mutableStateOf("Πάτησε για αναζήτηση διεύθυνσης token.") }
-            var contractLoading by remember(signal.symbol) { mutableStateOf(false) }
-            GlassCard(accent = when (signal.direction) { "BUY" -> Green; "SELL" -> Color(0xFFFF6677); else -> Violet }, compact = true) {
+            GlassCard(accent = if (signal.direction == "BUY") Green else Violet, compact = true) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(signal.symbol, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text(signal.direction, color = when (signal.direction) { "BUY" -> Green; "SELL" -> Color(0xFFFF6677); else -> Color(0xFFFFC857) }, fontWeight = FontWeight.Bold)
+                    Column(Modifier.weight(1f)) {
+                        Text(signal.symbol, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("\${signal.timeframe} • Βαθμολογία \${signal.score}/100", color = Muted, fontSize = 11.sp)
+                    }
+                    Text(signal.direction, color = if (signal.direction == "BUY") Green else if (signal.direction == "SELL") Color(0xFFFF6677) else Color(0xFFFFC857), fontWeight = FontWeight.ExtraBold)
                 }
-                Text("Βαθμολογία ${signal.score}/100  •  ${signal.timeframe}", color = Muted, fontSize = 11.sp)
-                Text("Entry: ${signal.price}", color = Green, fontSize = 11.sp)
-                signal.stopLoss?.let { Text("Stop Loss: $it", color = Color(0xFFFF6677), fontSize = 11.sp) }
-                signal.takeProfit?.let { Text("Take Profit: $it", color = Green, fontSize = 11.sp) }
-                signal.riskReward?.let { Text("Risk / Reward: 1:${String.format(java.util.Locale.US, "%.1f", it)}", color = Color(0xFFFFC857), fontSize = 11.sp) }
-                Text(signal.explanation, color = Muted, fontSize = 10.sp)
-                Spacer(Modifier.height(5.dp))
-                OutlinedButton(onClick = { detailsOpen = !detailsOpen }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (detailsOpen) "Απόκρυψη τεχνικής ανάλυσης" else "Ανάλυση κάθε τεχνικής")
-                }
-                if (detailsOpen) {
-                    signal.indicatorDetails.forEach { (name, description) ->
-                        Divider(color = Color.White.copy(alpha = 0.12f))
-                        Text(name, color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text(description, color = Muted, fontSize = 11.sp)
-                    }
-                    Divider(color = Color.White.copy(alpha = 0.12f))
-                    Text("Διεύθυνση token / Contract address", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("Οι διευθύνσεις εξαρτώνται από το δίκτυο. Έλεγξε ότι το δίκτυο ταιριάζει με το πορτοφόλι ή το ανταλλακτήριο.", color = Muted, fontSize = 10.sp)
-                    Button(
-                        onClick = {
-                            kotlinx.coroutines.MainScope().launch {
-                                contractLoading = true
-                                contractStatus = "Αναζήτηση διευθύνσεων..."
-                                try {
-                                    contracts = TokenContractApi.lookup(signal.symbol)
-                                    contractStatus = if (contracts.isEmpty()) "Δεν βρέθηκε contract address. Το νόμισμα μπορεί να είναι native coin ή να μην υπάρχει καταχώριση."
-                                    else "Βρέθηκαν ${contracts.size} διευθύνσεις δικτύου."
-                                } catch (e: Exception) {
-                                    contractStatus = "Αποτυχία αναζήτησης: ${e.message ?: "δοκίμασε ξανά"}"
-                                } finally {
-                                    contractLoading = false
-                                }
-                            }
-                        },
-                        enabled = !contractLoading,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Violet)
-                    ) {
-                        Text(if (contractLoading) "Αναζήτηση..." else "Εύρεση contract address")
-                    }
-                    Text(contractStatus, color = Muted, fontSize = 10.sp)
-                    contracts.forEach { contract ->
-                        Text(contract.network, color = Cyan, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
-                        Text(contract.address, color = Color.White, fontSize = 10.sp)
-                        OutlinedButton(
-                            onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Token contract address", contract.address))
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Αντιγραφή διεύθυνσης ${contract.network}")
-                        }
-                        if (contract.network.equals("Solana", ignoreCase = true)) {
-                            OutlinedButton(
-                                onClick = {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://pump.fun/"))
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Άνοιγμα Pump.fun")
-                            }
-                            Text(
-                                "Άνοιξε το Pump.fun και επικόλλησε εκεί το Mint Address. Η εμφάνιση διεύθυνσης Solana δεν σημαίνει ότι το token είναι καταχωρισμένο ή διαθέσιμο στο Pump.fun. Έλεγξε όνομα, σύμβολο, δίκτυο και ρευστότητα πριν από οποιαδήποτε αγορά.",
-                                color = Muted,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
+                Text(signal.explanation.substringBefore("\n"), color = Muted, fontSize = 10.sp, maxLines = 2)
+                Button(onClick = { onOpen(signal) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Violet)) {
+                    Text("Άνοιγμα πλήρους ανάλυσης  ↗")
                 }
             }
         }
     }
 }
 
+@Composable
+private fun SignalDetailScreen(signal: TechnicalSignal, onBack: () -> Unit) {
+    var info by remember { mutableStateOf<String?>(null) }
+    var contracts by remember { mutableStateOf<List<TokenContract>>(emptyList()) }
+    var status by remember { mutableStateOf("Πάτησε για αναζήτηση διεύθυνσης.") }
+    var loading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    Column(
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF111A35), Bg)))
+            .verticalScroll(rememberScrollState()).padding(18.dp)
+    ) {
+        TextButton(onClick = onBack) { Text("← Πίσω στα σήματα", color = Cyan) }
+        Text("ΑΝΑΛΥΣΗ ΝΟΜΙΣΜΑΤΟΣ", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(signal.symbol, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(12.dp))
+        GlassCard(accent = Violet) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("ΑΠΟΤΕΛΕΣΜΑ", color = Muted)
+                Text(signal.direction, color = if (signal.direction == "BUY") Green else if (signal.direction == "SELL") Color(0xFFFF6677) else Color(0xFFFFC857), fontWeight = FontWeight.Bold)
+            }
+            Text("\${signal.score}/100", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Χρονικό πλαίσιο: \${signal.timeframe}", color = Muted)
+            Divider(color = Color.White.copy(alpha = 0.12f))
+            Text("Τιμή αναφοράς: \${signal.price}", color = Green)
+            signal.stopLoss?.let { Text("Stop Loss: $it", color = Color(0xFFFF6677)) }
+            signal.takeProfit?.let { Text("Take Profit: $it", color = Green) }
+            signal.riskReward?.let { Text("Risk / Reward: 1:\${String.format(java.util.Locale.US, "%.1f", it)}", color = Color(0xFFFFC857)) }
+            Text("Ενδεικτικά επίπεδα — όχι εντολή αγοράς.", color = Muted, fontSize = 10.sp)
+        }
+        Spacer(Modifier.height(18.dp))
+        Text("Τεχνικές με απλή εξήγηση", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        signal.indicatorDetails.forEach { (name, description) ->
+            GlassCard(accent = Cyan, compact = true) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(name, Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { info = description }) { Text("ⓘ Info", color = Cyan) }
+                }
+                Text(description.substringAfter("Τώρα:", description), color = Muted, fontSize = 11.sp, maxLines = 3)
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        Text("ΔΙΕΥΘΥΝΣΗ TOKEN", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        GlassCard(accent = Violet) {
+            Text("Βρες και αντέγραψε τη διεύθυνση του token", color = Color.White, fontWeight = FontWeight.Bold)
+            Button(onClick = {
+                scope.launch {
+                    loading = true
+                    status = "Αναζήτηση..."
+                    try {
+                        contracts = TokenContractApi.lookup(signal.symbol)
+                        status = if (contracts.isEmpty()) "Δεν βρέθηκε καταχώριση. Μην αγοράσεις με μη επαληθευμένη διεύθυνση." else "Βρέθηκαν \${contracts.size} καταχωρίσεις — επιβεβαίωσε το δίκτυο και το token."
+                    } catch (e: Exception) { status = "Σφάλμα: \${e.message ?: "δοκίμασε ξανά"}" }
+                    loading = false
+                }
+            }, enabled = !loading, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Violet)) {
+                Text(if (loading) "Αναζήτηση..." else "Εύρεση contract address")
+            }
+            Text(status, color = Muted, fontSize = 10.sp)
+            contracts.forEach { token ->
+                Divider(color = Color.White.copy(alpha = 0.12f))
+                Text(token.network, color = Cyan, fontWeight = FontWeight.Bold)
+                Text(token.address, color = Color.White, fontSize = 10.sp)
+                OutlinedButton(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Token contract address", token.address))
+                }, modifier = Modifier.fillMaxWidth()) { Text("Αντιγραφή διεύθυνσης") }
+                if (token.network.equals("Solana", true)) {
+                    OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://pump.fun/"))) }, modifier = Modifier.fillMaxWidth()) { Text("Άνοιγμα Pump.fun") }
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Text("Εκπαιδευτική ανάλυση — όχι επενδυτική συμβουλή.", color = Muted, fontSize = 10.sp)
+    }
+    info?.let { text ->
+        AlertDialog(onDismissRequest = { info = null }, title = { Text("Τι σημαίνει;") }, text = { Text(text) },
+            confirmButton = { TextButton(onClick = { info = null }) { Text("Κατάλαβα") } },
+            containerColor = Panel, titleContentColor = Color.White, textContentColor = Muted)
+    }
+}
 
 private fun scheduleBackgroundMarketScan(context: Context) {
     val constraints = Constraints.Builder()
