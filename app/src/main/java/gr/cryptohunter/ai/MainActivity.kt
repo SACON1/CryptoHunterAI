@@ -4,7 +4,6 @@ package gr.cryptohunter.ai
 import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -38,7 +37,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -64,15 +62,33 @@ data class Signal(
 )
 
 class MainActivity : ComponentActivity() {
+    private val openedSignalSymbol = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        openedSignalSymbol.value = intent.getStringExtra(EXTRA_SIGNAL_SYMBOL)
         scheduleBackgroundMarketScan(applicationContext)
-        setContent { CryptoHunterApp() }
+        setContent {
+            CryptoHunterApp(
+                notificationSymbol = openedSignalSymbol.value,
+                onNotificationHandled = { openedSignalSymbol.value = null }
+            )
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openedSignalSymbol.value = intent.getStringExtra(EXTRA_SIGNAL_SYMBOL)
+    }
+
+    companion object {
+        const val EXTRA_SIGNAL_SYMBOL = "crypto_hunter_signal_symbol"
     }
 }
 
 @Composable
-fun CryptoHunterApp() {
+fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: () -> Unit = {}) {
     val context = LocalContext.current
     var notificationsEnabled by remember { mutableStateOf(SignalNotifications.areNotificationsEnabled(context)) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -90,6 +106,16 @@ fun CryptoHunterApp() {
     var scanStatus by remember { mutableStateOf("Η τεχνική ανάλυση δεν έχει ξεκινήσει.") }
     var selectedSignal by remember { mutableStateOf<TechnicalSignal?>(null) }
     LaunchedEffect(tab) { notificationsEnabled = SignalNotifications.areNotificationsEnabled(context) }
+    LaunchedEffect(technicalSignals, notificationSymbol) {
+        val symbol = notificationSymbol
+        if (!symbol.isNullOrBlank()) {
+            val match = technicalSignals.firstOrNull { it.symbol.equals(symbol, ignoreCase = true) }
+            if (match != null) {
+                selectedSignal = match
+                onNotificationHandled()
+            }
+        }
+    }
     val pulse = rememberInfiniteTransition(label = "live-pulse")
     val liveAlpha by pulse.animateFloat(0.45f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "live-alpha")
 
@@ -355,11 +381,6 @@ fun TechnicalSignalList(signals: List<TechnicalSignal>, onOpen: (TechnicalSignal
 @Composable
 private fun SignalDetailScreen(signal: TechnicalSignal, onBack: () -> Unit) {
     var info by remember { mutableStateOf<String?>(null) }
-    var contracts by remember { mutableStateOf<List<TokenContract>>(emptyList()) }
-    var status by remember { mutableStateOf("Πάτησε για αναζήτηση διεύθυνσης.") }
-    var loading by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     Column(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF111A35), Bg)))
             .verticalScroll(rememberScrollState()).padding(18.dp)
@@ -393,36 +414,6 @@ private fun SignalDetailScreen(signal: TechnicalSignal, onBack: () -> Unit) {
                 Text(description.substringAfter("Τώρα:", description), color = Muted, fontSize = 11.sp, maxLines = 3)
             }
             Spacer(Modifier.height(8.dp))
-        }
-        Text("ΔΙΕΥΘΥΝΣΗ TOKEN", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        GlassCard(accent = Violet) {
-            Text("Βρες και αντέγραψε τη διεύθυνση του token", color = Color.White, fontWeight = FontWeight.Bold)
-            Button(onClick = {
-                scope.launch {
-                    loading = true
-                    status = "Αναζήτηση..."
-                    try {
-                        contracts = TokenContractApi.lookup(signal.symbol)
-                        status = if (contracts.isEmpty()) "Δεν βρέθηκε καταχώριση. Μην αγοράσεις με μη επαληθευμένη διεύθυνση." else "Βρέθηκαν ${contracts.size} καταχωρίσεις — επιβεβαίωσε το δίκτυο και το token."
-                    } catch (e: Exception) { status = "Σφάλμα: ${e.message ?: "δοκίμασε ξανά"}" }
-                    loading = false
-                }
-            }, enabled = !loading, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Violet)) {
-                Text(if (loading) "Αναζήτηση..." else "Εύρεση contract address")
-            }
-            Text(status, color = Muted, fontSize = 10.sp)
-            contracts.forEach { token ->
-                Divider(color = Color.White.copy(alpha = 0.12f))
-                Text(token.network, color = Cyan, fontWeight = FontWeight.Bold)
-                Text(token.address, color = Color.White, fontSize = 10.sp)
-                OutlinedButton(onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Token contract address", token.address))
-                }, modifier = Modifier.fillMaxWidth()) { Text("Αντιγραφή διεύθυνσης") }
-                if (token.network.equals("Solana", true)) {
-                    OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://pump.fun/"))) }, modifier = Modifier.fillMaxWidth()) { Text("Άνοιγμα Pump.fun") }
-                }
-            }
         }
         Spacer(Modifier.height(20.dp))
         Text("Εκπαιδευτική ανάλυση — όχι επενδυτική συμβουλή.", color = Muted, fontSize = 10.sp)
