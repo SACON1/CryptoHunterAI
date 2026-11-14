@@ -120,6 +120,35 @@ internal suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport
         null
     )
 
+    try {
+        val pulse = MemeNewsSocialAgent.analyze(coin)
+        val newsDetail = if (pulse.score == null) {
+            pulse.note
+        } else {
+            "Sentiment score ${pulse.score}/100 • θετικές λέξεις: ${pulse.positive} • αρνητικές λέξεις: ${pulse.negative}. ${pulse.note}"
+        }
+        votes += MemeAgentVote(
+            "News & Social Agent",
+            when {
+                pulse.score == null -> "ΜΗ ΔΙΑΘΕΣΙΜΑ ΔΕΔΟΜΕΝΑ"
+                pulse.score >= 65 -> "ΘΕΤΙΚΟ SENTIMENT — ΜΗ ΕΠΙΒΕΒΑΙΩΜΕΝΟ"
+                pulse.score <= 35 -> "ΑΡΝΗΤΙΚΟ SENTIMENT — ΧΡΕΙΑΖΕΤΑΙ ΕΛΕΓΧΟΣ"
+                else -> "ΟΥΔΕΤΕΡΟ SENTIMENT"
+            },
+            newsDetail + if (pulse.items.isEmpty()) "" else " Πηγές: " + pulse.items.joinToString(" • ") { it.source },
+            pulse.score,
+            false
+        )
+    } catch (e: Exception) {
+        votes += MemeAgentVote(
+            "News & Social Agent",
+            "ΜΗ ΔΙΑΘΕΣΙΜΟ",
+            "Η αναζήτηση ειδήσεων/social απέτυχε: ${e.message ?: "άγνωστο σφάλμα"}. Δεν προσμετράται θετικό sentiment.",
+            null,
+            false
+        )
+    }
+
     val numeric = votes.mapNotNull { it.score }
     val average = if (numeric.isEmpty()) 0 else numeric.average().toInt()
     val blocked = votes.any { it.danger } || rugFailed
@@ -132,7 +161,7 @@ internal suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport
     }
     return MemeCouncilReport(
         finalScore, verdict, votes, blocked,
-        "Πρώτη rule-based έκδοση πολλών agents, όχι αυτόνομο AI μοντέλο. Δεν υπάρχει ακόμη live news/social sentiment και το αποτέλεσμα δεν είναι πρόβλεψη κέρδους."
+        "Rule-based αξιολόγηση πολλών agents με δημόσιες αναφορές Google News και Reddit. Το sentiment δεν επιβεβαιώνει γεγονότα και το αποτέλεσμα δεν είναι πρόβλεψη κέρδους."
     )
 }
 
