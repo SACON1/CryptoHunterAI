@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -327,8 +328,13 @@ fun SignalList(signals: List<Signal>) {
 
 @Composable
 fun TechnicalSignalList(signals: List<TechnicalSignal>) {
+    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         signals.forEach { signal ->
+            var detailsOpen by remember(signal.symbol) { mutableStateOf(false) }
+            var contracts by remember(signal.symbol) { mutableStateOf<List<TokenContract>>(emptyList()) }
+            var contractStatus by remember(signal.symbol) { mutableStateOf("Πάτησε για αναζήτηση διεύθυνσης token.") }
+            var contractLoading by remember(signal.symbol) { mutableStateOf(false) }
             GlassCard(accent = when (signal.direction) { "BUY" -> Green; "SELL" -> Color(0xFFFF6677); else -> Violet }, compact = true) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(signal.symbol, color = Color.White, fontWeight = FontWeight.Bold)
@@ -340,6 +346,56 @@ fun TechnicalSignalList(signals: List<TechnicalSignal>) {
                 signal.takeProfit?.let { Text("Take Profit: $it", color = Green, fontSize = 11.sp) }
                 signal.riskReward?.let { Text("Risk / Reward: 1:${String.format(java.util.Locale.US, "%.1f", it)}", color = Color(0xFFFFC857), fontSize = 11.sp) }
                 Text(signal.explanation, color = Muted, fontSize = 10.sp)
+                Spacer(Modifier.height(5.dp))
+                OutlinedButton(onClick = { detailsOpen = !detailsOpen }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (detailsOpen) "Απόκρυψη τεχνικής ανάλυσης" else "Ανάλυση κάθε τεχνικής")
+                }
+                if (detailsOpen) {
+                    signal.indicatorDetails.forEach { (name, description) ->
+                        Divider(color = Color.White.copy(alpha = 0.12f))
+                        Text(name, color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(description, color = Muted, fontSize = 11.sp)
+                    }
+                    Divider(color = Color.White.copy(alpha = 0.12f))
+                    Text("Διεύθυνση token / Contract address", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Οι διευθύνσεις εξαρτώνται από το δίκτυο. Έλεγξε ότι το δίκτυο ταιριάζει με το πορτοφόλι ή το ανταλλακτήριο.", color = Muted, fontSize = 10.sp)
+                    Button(
+                        onClick = {
+                            kotlinx.coroutines.MainScope().launch {
+                                contractLoading = true
+                                contractStatus = "Αναζήτηση διευθύνσεων..."
+                                try {
+                                    contracts = TokenContractApi.lookup(signal.symbol)
+                                    contractStatus = if (contracts.isEmpty()) "Δεν βρέθηκε contract address. Το νόμισμα μπορεί να είναι native coin ή να μην υπάρχει καταχώριση."
+                                    else "Βρέθηκαν ${contracts.size} διευθύνσεις δικτύου."
+                                } catch (e: Exception) {
+                                    contractStatus = "Αποτυχία αναζήτησης: ${e.message ?: "δοκίμασε ξανά"}"
+                                } finally {
+                                    contractLoading = false
+                                }
+                            }
+                        },
+                        enabled = !contractLoading,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Violet)
+                    ) {
+                        Text(if (contractLoading) "Αναζήτηση..." else "Εύρεση contract address")
+                    }
+                    Text(contractStatus, color = Muted, fontSize = 10.sp)
+                    contracts.forEach { contract ->
+                        Text(contract.network, color = Cyan, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+                        Text(contract.address, color = Color.White, fontSize = 10.sp)
+                        OutlinedButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Token contract address", contract.address))
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Αντιγραφή διεύθυνσης ${contract.network}")
+                        }
+                    }
+                }
             }
         }
     }
