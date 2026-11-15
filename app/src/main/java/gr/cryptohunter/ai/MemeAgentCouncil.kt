@@ -166,38 +166,45 @@ internal data class MemeMasterPick(
 
 internal data class MemeMasterResult(
     val picks: List<MemeMasterPick>,
+    val watchlist: List<MemeMasterPick>,
     val evaluated: Int,
     val rejected: Int
 )
 
 /**
- * Final gatekeeper: it never upgrades a coin based on a single positive agent.
- * Missing news/social data or any dangerous/unknown rug check excludes the candidate.
+ * Final gatekeeper: unknown or dangerous rug checks never become a recommendation.
+ * Incomplete news/social data can appear only in a clearly-labelled watchlist.
  */
 internal object MemeMasterAgent {
     fun select(evaluated: List<Pair<MemeCandidate, MemeCouncilReport>>): MemeMasterResult {
-        val picks = evaluated.mapNotNull { (coin, report) ->
+        val ranked = evaluated.mapNotNull { (coin, report) ->
             val newsVote = report.votes.firstOrNull { it.name == "News & Social Agent" }
             val rugVote = report.votes.firstOrNull { it.name == "Rug Pull Hunter" }
             val missingNews = newsVote?.score == null
             val negativeNews = (newsVote?.score ?: 50) <= 25
             val rugNotCleared = rugVote == null || rugVote.danger || rugVote.score == null
             val marketTooThin = coin.liquidity < 10_000 || coin.volume24h < 5_000 || coin.transactions < 20
-            if (report.blocked || missingNews || negativeNews || rugNotCleared || marketTooThin || report.score < 75) {
-                null
-            } else {
-                MemeMasterPick(
-                    coin,
-                    report,
-                    "Πέρασε όλους τους διαθέσιμους ελέγχους, χωρίς κρίσιμο rug flag, με επαρκή ρευστότητα/όγκο και score ${report.score}/100. Το sentiment είναι ένδειξη, όχι επιβεβαίωση."
-                )
+            if (report.blocked || rugNotCleared || marketTooThin || negativeNews || report.score < 55) null
+            else {
+                val reason = if (missingNews) {
+                    "Πέρασε βασικά market/rug φίλτρα, αλλά λείπουν news/social δεδομένα. Παραμένει μόνο σε watchlist."
+                } else {
+                    "Πέρασε τα διαθέσιμα market, rug και sentiment φίλτρα. Απαιτείται ανθρώπινος έλεγχος πριν από αγορά."
+                }
+                MemeMasterPick(coin, report, reason)
             }
         }.sortedWith(
             compareByDescending<MemeMasterPick> { it.report.score }
                 .thenByDescending { it.coin.liquidity }
                 .thenByDescending { it.coin.volume24h }
-        ).take(5)
-        return MemeMasterResult(picks, evaluated.size, evaluated.size - picks.size)
+        )
+        val picks = ranked.filter { pick ->
+            val newsVote = pick.report.votes.firstOrNull { it.name == "News & Social Agent" }
+            newsVote?.score != null && newsVote.score > 25 && pick.report.score >= 75
+        }.take(5)
+        val pickKeys = picks.map { it.coin.chain + ":" + it.coin.address }.toSet()
+        val watchlist = ranked.filter { it.coin.chain + ":" + it.coin.address !in pickKeys }.take(8)
+        return MemeMasterResult(picks, watchlist, evaluated.size, evaluated.size - picks.size - watchlist.size)
     }
 }
 
