@@ -220,9 +220,7 @@ fun MemeCoinRadarScreen() {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.weight(1f)) {
-                Text("MEME COIN RADAR", color = Color(0xFF45D9FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text("MEME COIN RADAR", color = Color(0xFF45D9FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Text("Νέα meme coins", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
             }
             Text(if (loading) "● SCANNING" else "● RADAR", color = if (loading) Color(0xFFFFC857) else Color(0xFF42E6B0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
