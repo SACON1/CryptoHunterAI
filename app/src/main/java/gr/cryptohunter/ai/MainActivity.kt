@@ -171,7 +171,7 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
         } else {
         Column(
             Modifier.fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color(0xFF111A35), Bg, Color(0xFF080B17))))
+                .background(Brush.verticalGradient(listOf(Color(0xFF172344), Color(0xFF0B1228), Bg, Color(0xFF070B16))))
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp, vertical = 16.dp)
         ) {
@@ -179,12 +179,16 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
                 androidx.compose.foundation.Image(
                     painter = painterResource(id = R.drawable.ic_crypto_hunter),
                     contentDescription = "Crypto Hunter AI",
-                    modifier = Modifier.size(62.dp).graphicsLayer { scaleX = 0.98f + liveAlpha * 0.035f; scaleY = 0.98f + liveAlpha * 0.035f },
+                    modifier = Modifier.size(70.dp)
+                        .background(Brush.linearGradient(listOf(Color(0xFF243B67), Color(0xFF151C3A))), RoundedCornerShape(22.dp))
+                        .border(1.dp, Brush.linearGradient(listOf(Cyan.copy(alpha = 0.75f), Violet.copy(alpha = 0.65f))), RoundedCornerShape(22.dp))
+                        .padding(4.dp)
+                        .graphicsLayer { scaleX = 0.985f + liveAlpha * 0.025f; scaleY = 0.985f + liveAlpha * 0.025f },
                     contentScale = ContentScale.Crop
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("CRYPTO HUNTER", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("CRYPTO HUNTER", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
                     Text("AI  •  SMART MARKET RADAR", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
                 Text(
@@ -341,9 +345,9 @@ private fun GlassCard(
 ) {
     Column(
         modifier.fillMaxWidth()
-            .background(Brush.linearGradient(listOf(Color(0xD91D2945), Color(0xB3101830), Color(0xC91C2540))), RoundedCornerShape(22.dp))
-            .border(1.dp, Brush.linearGradient(listOf(accent.copy(alpha = 0.55f), Color.White.copy(alpha = 0.10f), Violet.copy(alpha = 0.25f))), RoundedCornerShape(22.dp))
-            .padding(if (compact) 13.dp else 17.dp),
+            .background(Brush.linearGradient(listOf(Color(0xE6253556), Color(0xD914203B), Color(0xE61A2544))), RoundedCornerShape(26.dp))
+            .border(1.dp, Brush.linearGradient(listOf(accent.copy(alpha = 0.72f), Color.White.copy(alpha = 0.13f), Violet.copy(alpha = 0.38f))), RoundedCornerShape(26.dp))
+            .padding(if (compact) 14.dp else 19.dp),
         content = content
     )
 }
@@ -362,8 +366,8 @@ private fun GlassChip(label: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun SectionTitle(title: String, subtitle: String) {
-    Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-    Text(subtitle, color = Muted, fontSize = 9.sp)
+    Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp)
+    Text(subtitle, color = Muted, fontSize = 9.sp, letterSpacing = 1.0.sp)
     Spacer(Modifier.height(9.dp))
 }
 
