@@ -120,8 +120,12 @@ fun MemeCoinRadarScreen() {
     var error by remember { mutableStateOf("") }
     var refresh by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<MemeCandidate?>(null) }
+    var selectedReport by remember { mutableStateOf<MemeCouncilReport?>(null) }
+    var masterPicks by remember { mutableStateOf<List<MemeMasterPick>>(emptyList()) }
     var agentScores by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var agentStatus by remember { mutableStateOf("Οι agents περιμένουν την πρώτη σάρωση.") }
+    var evaluatedCount by remember { mutableIntStateOf(0) }
+    var rejectedCount by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -140,27 +144,43 @@ fun MemeCoinRadarScreen() {
 
     LaunchedEffect(scan?.checkedAt) {
         val current = scan ?: return@LaunchedEffect
-        agentStatus = "Οι agents αξιολογούν τις καλύτερες υποψηφιότητες..."
-        val scores = mutableMapOf<String, Int>()
-        for (coin in current.coins.take(5)) {
+        masterPicks = emptyList()
+        agentScores = emptyMap()
+        evaluatedCount = 0
+        rejectedCount = 0
+        agentStatus = "1/4: Οι εξειδικευμένοι agents ελέγχουν υποψηφιότητες..."
+        val evaluated = mutableListOf<Pair<MemeCandidate, MemeCouncilReport>>()
+        val candidates = current.coins
+            .sortedWith(compareByDescending<MemeCandidate> { it.liquidity }.thenByDescending { it.volume24h })
+            .take(12)
+
+        for ((index, coin) in candidates.withIndex()) {
+            agentStatus = "Έλεγχος agents: ${index + 1}/${candidates.size} • ${coin.symbol}"
             try {
                 val report = runMemeAgentCouncil(coin)
-                val key = coin.chain + ":" + coin.address
-                scores[key] = if (report.blocked) 0 else report.score
-                if (!report.blocked && report.score >= 75) {
-                    val prefs = context.getSharedPreferences("meme_radar_alerts", android.content.Context.MODE_PRIVATE)
-                    val last = prefs.getLong(key, 0L)
-                    if (System.currentTimeMillis() - last >= 12 * 60 * 60 * 1000L) {
-                        MemeRadarAlerts.notify(context, coin, report.score, report.verdict)
-                        prefs.edit().putLong(key, System.currentTimeMillis()).apply()
-                    }
-                }
+                evaluated += coin to report
+                agentScores = agentScores + ((coin.chain + ":" + coin.address) to report.score)
             } catch (_: Exception) {
-                scores[coin.chain + ":" + coin.address] = 0
+                // Failed evaluation is excluded; it is never treated as a clean token.
             }
         }
-        agentScores = scores
-        agentStatus = "Αξιολογήθηκαν ${scores.size} υποψήφια • αυτόματη επανάληψη σε 2 λεπτά."
+
+        val master = MemeMasterAgent.select(evaluated)
+        masterPicks = master.picks
+        evaluatedCount = master.evaluated
+        rejectedCount = master.rejected
+
+        val prefs = context.getSharedPreferences("meme_radar_alerts", android.content.Context.MODE_PRIVATE)
+        for (pick in master.picks) {
+            val coin = pick.coin
+            val key = coin.chain + ":" + coin.address
+            val last = prefs.getLong(key, 0L)
+            if (System.currentTimeMillis() - last >= 12 * 60 * 60 * 1000L) {
+                MemeRadarAlerts.notify(context, coin, pick.report.score, pick.report.verdict)
+                prefs.edit().putLong(key, System.currentTimeMillis()).apply()
+            }
+        }
+        agentStatus = "Master Agent: ${master.picks.size} επιλεγμένα από ${master.evaluated} ελεγμένα • ${master.rejected} απορρίφθηκαν."
     }
 
     if (selected != null) {
@@ -189,7 +209,7 @@ fun MemeCoinRadarScreen() {
             else flags.forEach { Text("⚠ $it", color = Color(0xFFFFC857), fontSize = 12.sp) }
             Text("Δεν ελέγχθηκαν ακόμη owner privileges, mint/freeze authority, holder concentration, developer history ή honeypot με ανεξάρτητο on-chain scanner.", color = Color(0xFFA7B4D0), fontSize = 11.sp)
             RugPullCheckCard(coin.chain, coin.address)
-            MemeAgentCouncilCard(coin)
+            MemeAgentCouncilCard(coin, selectedReport)
             if (coin.url.startsWith("https://")) {
                 Button(onClick = { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(coin.url))) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B75FF))) {
                     Text("Άνοιγμα DexScreener", color = Color.White)
@@ -218,36 +238,49 @@ fun MemeCoinRadarScreen() {
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF9B75FF))
         if (error.isNotBlank()) Text("Σφάλμα: $error", color = Color(0xFFFFC857), fontSize = 11.sp)
         Text("ΠΡΟΣΟΧΗ: Τα boosts είναι πληρωμένες προωθήσεις. Η εμφάνιση εδώ δεν σημαίνει ότι ένα coin είναι legit ή ασφαλές.", color = Color(0xFFFFC857), fontSize = 11.sp)
-        if (scan?.coins.isNullOrEmpty() && !loading) Text("Δεν βρέθηκαν νέα ζεύγη από τις διαθέσιμες πηγές αυτή τη στιγμή.", color = Color.White)
-        scan?.coins?.sortedByDescending { agentScores[it.chain + ":" + it.address] ?: -1 }?.forEach { coin ->
-            val flags = (if (coin.liquidity < 10000) 1 else 0) +
-                (if (coin.volume24h < 5000) 1 else 0) +
-                (if (coin.ageHours != null && coin.ageHours < 24) 1 else 0) +
-                (if (coin.transactions < 20) 1 else 0)
+        Text("MEME COIN RADAR", color = Color(0xFF45D9FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text("Κορυφαίες ευκαιρίες μετά από έλεγχο", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Η λίστα εμφανίζει μόνο όσα πέρασαν από τους εξειδικευμένους agents και τον τελικό Master Agent.", color = Color(0xFFA7B4D0), fontSize = 11.sp)
+        Text(agentStatus, color = Color(0xFF45D9FF), fontSize = 10.sp)
+        scan?.let { Text("Πηγή αγοράς: DexScreener • Σάρωση ${it.checkedAt}", color = Color(0xFFA7B4D0), fontSize = 10.sp) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { refresh++ }, enabled = !loading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B75FF))) {
+                Text(if (loading) "Σάρωση..." else "↻ Σάρωση τώρα")
+            }
+            if (loading) Text("Οι agents εργάζονται...", color = Color(0xFFFFC857), modifier = Modifier.padding(top = 12.dp), fontSize = 10.sp)
+        }
+        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF9B75FF))
+        if (error.isNotBlank()) Text("Σφάλμα: $error", color = Color(0xFFFFC857), fontSize = 11.sp)
+        Text("Αν δεν περάσει κάποιο coin όλους τους ελέγχους, δεν εμφανίζεται ως ευκαιρία. Αυτό δεν αποτελεί εγγύηση ασφάλειας ή κέρδους.", color = Color(0xFFFFC857), fontSize = 11.sp)
+        if (!loading && scan != null && masterPicks.isEmpty()) {
+            Text("Δεν βρέθηκε coin που να περνά όλα τα κριτήρια σε αυτή τη σάρωση. Οι απορρίψεις δεν προβάλλονται ως ευκαιρίες.", color = Color.White, fontSize = 13.sp)
+        }
+        masterPicks.forEachIndexed { index, pick ->
+            val coin = pick.coin
             Column(
                 Modifier.fillMaxWidth()
                     .background(Brush.linearGradient(listOf(Color(0xDD1D2945), Color(0xCC111A30))), RoundedCornerShape(18.dp))
                     .border(1.dp, Color(0x559B75FF), RoundedCornerShape(18.dp))
                     .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
+                verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(Modifier.weight(1f)) {
-                        Text(coin.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+                        Text("${index + 1}. ${coin.name}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
                         Text("${coin.symbol} • ${coin.chain}", color = Color(0xFF45D9FF), fontSize = 10.sp)
                     }
-                    Text(if (flags >= 2) "ΥΨΗΛΟ ΡΙΣΚΟ" else if (flags == 1) "ΠΡΟΣΟΧΗ" else "ΒΑΣΙΚΑ OK", color = if (flags >= 2) Color(0xFFFF7185) else Color(0xFFFFC857), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("PICK", color = Color(0xFF42E6B0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
+                Text("MASTER SCORE: ${pick.report.score}/100", color = Color(0xFF42E6B0), fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("LP ${usdShort(coin.liquidity)}", color = Color.White, fontSize = 11.sp)
                     Text("Vol ${usdShort(coin.volume24h)}", color = Color.White, fontSize = 11.sp)
                     Text("${String.format(Locale.US, "%.1f", coin.change24h)}%", color = if (coin.change24h >= 0) Color(0xFF42E6B0) else Color(0xFFFF7185), fontSize = 11.sp)
                 }
-                agentScores[coin.chain + ":" + coin.address]?.let { score ->
-                    Text("Agent score: $score/100", color = if (score >= 75) Color(0xFF42E6B0) else Color(0xFFA7B4D0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                } ?: Text("Οι agents αξιολογούν...", color = Color(0xFFA7B4D0), fontSize = 9.sp)
-                Text("Το αρχικό risk label δεν αποτελεί απόδειξη ότι ένα token είναι ασφαλές.", color = Color(0xFFA7B4D0), fontSize = 9.sp)
-                TextButton(onClick = { selected = coin }) { Text("Πλήρης εικόνα & red flags  →", color = Color(0xFF45D9FF)) }
+                Text(pick.masterReason, color = Color(0xFFA7B4D0), fontSize = 10.sp)
+                TextButton(onClick = { selected = coin; selectedReport = pick.report }) {
+                    Text("Δες την πλήρη ανάλυση όλων των agents →", color = Color(0xFF45D9FF))
+                }
             }
         }
     }
