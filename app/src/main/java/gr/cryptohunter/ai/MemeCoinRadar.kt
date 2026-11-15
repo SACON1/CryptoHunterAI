@@ -122,6 +122,7 @@ fun MemeCoinRadarScreen() {
     var selected by remember { mutableStateOf<MemeCandidate?>(null) }
     var selectedReport by remember { mutableStateOf<MemeCouncilReport?>(null) }
     var masterPicks by remember { mutableStateOf<List<MemeMasterPick>>(emptyList()) }
+    var masterWatchlist by remember { mutableStateOf<List<MemeMasterPick>>(emptyList()) }
     var agentScores by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var agentStatus by remember { mutableStateOf("Οι agents περιμένουν την πρώτη σάρωση.") }
     var evaluatedCount by remember { mutableIntStateOf(0) }
@@ -147,6 +148,7 @@ fun MemeCoinRadarScreen() {
     LaunchedEffect(scan?.checkedAt) {
         val current = scan ?: return@LaunchedEffect
         masterPicks = emptyList()
+        masterWatchlist = emptyList()
         agentScores = emptyMap()
         evaluatedCount = 0
         rejectedCount = 0
@@ -175,6 +177,7 @@ fun MemeCoinRadarScreen() {
 
         val master = MemeMasterAgent.select(evaluated)
         masterPicks = master.picks
+        masterWatchlist = master.watchlist
         evaluatedCount = master.evaluated
         rejectedCount = master.rejected
 
@@ -253,7 +256,10 @@ fun MemeCoinRadarScreen() {
         }
         Text("ΠΡΟΣΟΧΗ: Τα boosts είναι πληρωμένες προωθήσεις. Οι έλεγχοι μειώνουν κινδύνους αλλά δεν εγγυώνται ότι ένα coin είναι ασφαλές ή κερδοφόρο.", color = Color(0xFFFFC857), fontSize = 11.sp)
         if (!loading && scan != null && masterPicks.isEmpty()) {
-            Text("Δεν βρέθηκε coin που να περνά όλα τα κριτήρια. Καλύτερα καμία επιλογή παρά επικίνδυνη επιλογή.", color = Color.White, fontSize = 13.sp)
+            Text("Δεν υπάρχει αυτή τη στιγμή coin που να περνά όλα τα κριτήρια για ισχυρή υποψηφιότητα. Δες την ξεχωριστή watchlist παρακάτω.", color = Color.White, fontSize = 13.sp)
+        }
+        if (masterPicks.isNotEmpty()) {
+            Text("ΚΟΡΥΦΑΙΕΣ ΥΠΟΨΗΦΙΟΤΗΤΕΣ", color = Color(0xFF42E6B0), fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
         }
         masterPicks.forEachIndexed { index, pick ->
             val coin = pick.coin
@@ -280,6 +286,28 @@ fun MemeCoinRadarScreen() {
                 Text(pick.masterReason, color = Color(0xFFA7B4D0), fontSize = 10.sp)
                 TextButton(onClick = { selected = coin; selectedReport = pick.report }) {
                     Text("Δες την πλήρη ανάλυση όλων των agents →", color = Color(0xFF45D9FF))
+                }
+            }
+        }
+        if (masterWatchlist.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text("WATCHLIST • ΧΡΕΙΑΖΕΤΑΙ ΕΠΙΠΛΕΟΝ ΕΠΙΒΕΒΑΙΩΣΗ", color = Color(0xFFFFC857), fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+            Text("Δεν στέλνονται alerts αγοράς για αυτά. Τα news/social ή άλλα δεδομένα είναι ελλιπή ή χρειάζονται επιβεβαίωση.", color = Color(0xFFA7B4D0), fontSize = 10.sp)
+            masterWatchlist.forEachIndexed { index, pick ->
+                val coin = pick.coin
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(Color(0xCC20243A), RoundedCornerShape(14.dp))
+                        .border(1.dp, Color(0x66FFC857), RoundedCornerShape(14.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("${index + 1}. ${coin.name} • ${coin.symbol}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("${coin.chain} • SCORE ${pick.report.score}/100 • LP ${usdShort(coin.liquidity)}", color = Color(0xFFFFC857), fontSize = 10.sp)
+                    Text(pick.masterReason, color = Color(0xFFA7B4D0), fontSize = 10.sp)
+                    TextButton(onClick = { selected = coin; selectedReport = pick.report }) {
+                        Text("Δες γιατί είναι σε watchlist →", color = Color(0xFF45D9FF))
+                    }
                 }
             }
         }
