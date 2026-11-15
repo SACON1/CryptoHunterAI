@@ -158,10 +158,53 @@ internal suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport
     )
 }
 
+internal data class MemeMasterPick(
+    val coin: MemeCandidate,
+    val report: MemeCouncilReport,
+    val masterReason: String
+)
+
+internal data class MemeMasterResult(
+    val picks: List<MemeMasterPick>,
+    val evaluated: Int,
+    val rejected: Int
+)
+
+/**
+ * Final gatekeeper: it never upgrades a coin based on a single positive agent.
+ * Missing news/social data or any dangerous/unknown rug check excludes the candidate.
+ */
+internal object MemeMasterAgent {
+    fun select(evaluated: List<Pair<MemeCandidate, MemeCouncilReport>>): MemeMasterResult {
+        val picks = evaluated.mapNotNull { (coin, report) ->
+            val newsVote = report.votes.firstOrNull { it.name == "News & Social Agent" }
+            val rugVote = report.votes.firstOrNull { it.name == "Rug Pull Hunter" }
+            val missingNews = newsVote?.score == null
+            val negativeNews = (newsVote?.score ?: 50) <= 25
+            val rugNotCleared = rugVote == null || rugVote.danger || rugVote.score == null
+            val marketTooThin = coin.liquidity < 10_000 || coin.volume24h < 5_000 || coin.transactions < 20
+            if (report.blocked || missingNews || negativeNews || rugNotCleared || marketTooThin || report.score < 75) {
+                null
+            } else {
+                MemeMasterPick(
+                    coin,
+                    report,
+                    "Πέρασε όλους τους διαθέσιμους ελέγχους, χωρίς κρίσιμο rug flag, με επαρκή ρευστότητα/όγκο και score ${report.score}/100. Το sentiment είναι ένδειξη, όχι επιβεβαίωση."
+                )
+            }
+        }.sortedWith(
+            compareByDescending<MemeMasterPick> { it.report.score }
+                .thenByDescending { it.coin.liquidity }
+                .thenByDescending { it.coin.volume24h }
+        ).take(5)
+        return MemeMasterResult(picks, evaluated.size, evaluated.size - picks.size)
+    }
+}
+
 @Composable
-internal fun MemeAgentCouncilCard(coin: MemeCandidate) {
+internal fun MemeAgentCouncilCard(coin: MemeCandidate, initialReport: MemeCouncilReport? = null) {
     var loading by remember(coin.address) { mutableStateOf(false) }
-    var report by remember(coin.address) { mutableStateOf<MemeCouncilReport?>(null) }
+    var report by remember(coin.address) { mutableStateOf(initialReport) }
     var error by remember(coin.address) { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
