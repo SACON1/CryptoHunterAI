@@ -197,9 +197,11 @@ internal data class MemeMasterResult(
 internal object MemeMasterAgent {
     fun select(evaluated: List<Pair<MemeCandidate, MemeCouncilReport>>): MemeMasterResult {
         val ranked = evaluated.mapNotNull { (coin, report) ->
-            val newsVote = report.votes.firstOrNull { it.name == "News Agent" }\n            val socialVote = report.votes.firstOrNull { it.name == "Social Agent (X + Reddit)" }
+            val newsVote = report.votes.firstOrNull { it.name == "News Agent" }
+            val socialVote = report.votes.firstOrNull { it.name == "Social Agent (X + Reddit)" }
             val rugVote = report.votes.firstOrNull { it.name == "Rug Pull Hunter" }
-            val missingNews = newsVote?.score == null\n            val missingSocial = socialVote?.score == null
+            val missingNews = newsVote?.score == null
+            val missingSocial = socialVote?.score == null
             val negativeNews = (newsVote?.score ?: 50) <= 25 || (socialVote?.score ?: 50) <= 25
             val rugNotCleared = rugVote == null || rugVote.danger || rugVote.score == null
             val marketTooThin = coin.liquidity < 10_000 || coin.volume24h < 5_000 || coin.transactions < 20
@@ -218,7 +220,8 @@ internal object MemeMasterAgent {
                 .thenByDescending { it.coin.volume24h }
         )
         val picks = ranked.filter { pick ->
-            val newsVote = pick.report.votes.firstOrNull { it.name == "News Agent" }\n            val socialVote = pick.report.votes.firstOrNull { it.name == "Social Agent (X + Reddit)" }
+            val newsVote = pick.report.votes.firstOrNull { it.name == "News Agent" }
+            val socialVote = pick.report.votes.firstOrNull { it.name == "Social Agent (X + Reddit)" }
             newsVote?.score != null && newsVote.score > 25 && socialVote?.score != null && socialVote.score > 25 && pick.report.score >= 75
         }.take(5)
         val pickKeys = picks.map { it.coin.chain + ":" + it.coin.address }.toSet()
