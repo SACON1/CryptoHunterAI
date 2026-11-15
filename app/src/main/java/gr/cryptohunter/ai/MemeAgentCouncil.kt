@@ -115,22 +115,41 @@ internal suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport
 
     try {
         val pulse = MemeNewsSocialAgent.analyze(coin)
-        val newsDetail = if (pulse.score == null) {
-            pulse.note
-        } else {
-            "Sentiment score ${pulse.score}/100 • θετικές λέξεις: ${pulse.positive} • αρνητικές λέξεις: ${pulse.negative}. ${pulse.note}"
+        fun sourceScore(items: List<NewsSocialItem>): Int? {
+            if (items.isEmpty()) return null
+            val positiveTerms = listOf("partnership", "listing", "launch", "integration", "adoption", "funding", "airdrop", "bullish", "approved", "upgrade", "mainnet")
+            val negativeTerms = listOf("rug pull", "rugpull", "scam", "fraud", "exploit", "hacked", "hack", "drained", "stolen", "lawsuit", "delisted", "dump", "honeypot", "phishing")
+            val positive = items.sumOf { item -> positiveTerms.count { "${item.title} ${item.summary}".contains(it, ignoreCase = true) } }
+            val negative = items.sumOf { item -> negativeTerms.count { "${item.title} ${item.summary}".contains(it, ignoreCase = true) } }
+            return (50 + positive * 7 - negative * 12).coerceIn(0, 100)
         }
+        val newsItems = pulse.items.filter { it.source == "Google News" }
+        val socialItems = pulse.items.filter { it.source.contains("X / Twitter") || it.source == "Reddit" }
+        val newsScore = sourceScore(newsItems)
+        val socialScore = sourceScore(socialItems)
         votes += MemeAgentVote(
-            "News & Social Agent",
+            "News Agent",
             when {
-                pulse.score == null -> "ΜΗ ΔΙΑΘΕΣΙΜΑ ΔΕΔΟΜΕΝΑ"
-                pulse.score >= 65 -> "ΘΕΤΙΚΟ SENTIMENT — ΜΗ ΕΠΙΒΕΒΑΙΩΜΕΝΟ"
-                pulse.score <= 35 -> "ΑΡΝΗΤΙΚΟ SENTIMENT — ΧΡΕΙΑΖΕΤΑΙ ΕΛΕΓΧΟΣ"
-                else -> "ΟΥΔΕΤΕΡΟ SENTIMENT"
+                newsScore == null -> "ΜΗ ΔΙΑΘΕΣΙΜΕΣ ΑΝΑΦΟΡΕΣ"
+                newsScore >= 65 -> "ΘΕΤΙΚΕΣ ΕΝΔΕΙΞΕΙΣ — ΠΡΟΣ ΕΠΙΒΕΒΑΙΩΣΗ"
+                newsScore <= 35 -> "ΑΡΝΗΤΙΚΕΣ ΕΝΔΕΙΞΕΙΣ"
+                else -> "ΟΥΔΕΤΕΡΕΣ ΑΝΑΦΟΡΕΣ"
             },
-            newsDetail + if (pulse.items.isEmpty()) "" else "\nΑναφορές: " + pulse.items.take(3).joinToString(" | ") { "${it.source}: ${it.title}" },
-            pulse.score,
-            false
+            "Google News: ${newsItems.size} σχετικές αναφορές • score ${newsScore ?: "—"}/100. ${pulse.note}",
+            newsScore,
+            newsScore != null && newsScore <= 20
+        )
+        votes += MemeAgentVote(
+            "Social Agent (X + Reddit)",
+            when {
+                socialScore == null -> "ΜΗ ΔΙΑΘΕΣΙΜΕΣ ΑΝΑΦΟΡΕΣ"
+                socialScore >= 65 -> "ΘΕΤΙΚΟ SOCIAL BUZZ — ΜΗ ΕΠΙΒΕΒΑΙΩΜΕΝΟ"
+                socialScore <= 35 -> "ΑΡΝΗΤΙΚΟ SOCIAL BUZZ"
+                else -> "ΟΥΔΕΤΕΡΟ SOCIAL BUZZ"
+            },
+            "X/Twitter indexed: ${socialItems.count { it.source.contains("X / Twitter") }} • Reddit: ${socialItems.count { it.source == "Reddit" }} • score ${socialScore ?: "—"}/100. Δεν είναι πλήρης live κάλυψη του X.",
+            socialScore,
+            socialScore != null && socialScore <= 20
         )
     } catch (e: Exception) {
         votes += MemeAgentVote(
@@ -154,7 +173,7 @@ internal suspend fun runMemeAgentCouncil(coin: MemeCandidate): MemeCouncilReport
     }
     return MemeCouncilReport(
         finalScore, verdict, votes, blocked,
-        "Rule-based αξιολόγηση πολλών agents με δημόσιες αναφορές Google News και Reddit. Το sentiment δεν επιβεβαιώνει γεγονότα και το αποτέλεσμα δεν είναι πρόβλεψη κέρδους."
+        "Rule-based αξιολόγηση πολλών agents με Google News, δημόσια indexed posts του X/Twitter και Reddit. Το sentiment δεν επιβεβαιώνει γεγονότα και το αποτέλεσμα δεν είναι πρόβλεψη κέρδους."
     )
 }
 
@@ -178,15 +197,15 @@ internal data class MemeMasterResult(
 internal object MemeMasterAgent {
     fun select(evaluated: List<Pair<MemeCandidate, MemeCouncilReport>>): MemeMasterResult {
         val ranked = evaluated.mapNotNull { (coin, report) ->
-            val newsVote = report.votes.firstOrNull { it.name == "News & Social Agent" }
+            val newsVote = report.votes.firstOrNull { it.name == "News Agent" }\n            val socialVote = report.votes.firstOrNull { it.name == "Social Agent (X + Reddit)" }
             val rugVote = report.votes.firstOrNull { it.name == "Rug Pull Hunter" }
-            val missingNews = newsVote?.score == null
-            val negativeNews = (newsVote?.score ?: 50) <= 25
+            val missingNews = newsVote?.score == null\n            val missingSocial = socialVote?.score == null
+            val negativeNews = (newsVote?.score ?: 50) <= 25 || (socialVote?.score ?: 50) <= 25
             val rugNotCleared = rugVote == null || rugVote.danger || rugVote.score == null
             val marketTooThin = coin.liquidity < 10_000 || coin.volume24h < 5_000 || coin.transactions < 20
             if (report.blocked || rugNotCleared || marketTooThin || negativeNews || report.score < 55) null
             else {
-                val reason = if (missingNews) {
+                val reason = if (missingNews || missingSocial) {
                     "Πέρασε βασικά market/rug φίλτρα, αλλά λείπουν news/social δεδομένα. Παραμένει μόνο σε watchlist."
                 } else {
                     "Πέρασε τα διαθέσιμα market, rug και sentiment φίλτρα. Απαιτείται ανθρώπινος έλεγχος πριν από αγορά."
@@ -199,8 +218,8 @@ internal object MemeMasterAgent {
                 .thenByDescending { it.coin.volume24h }
         )
         val picks = ranked.filter { pick ->
-            val newsVote = pick.report.votes.firstOrNull { it.name == "News & Social Agent" }
-            newsVote?.score != null && newsVote.score > 25 && pick.report.score >= 75
+            val newsVote = pick.report.votes.firstOrNull { it.name == "News Agent" }\n            val socialVote = pick.report.votes.firstOrNull { it.name == "Social Agent (X + Reddit)" }
+            newsVote?.score != null && newsVote.score > 25 && socialVote?.score != null && socialVote.score > 25 && pick.report.score >= 75
         }.take(5)
         val pickKeys = picks.map { it.coin.chain + ":" + it.coin.address }.toSet()
         val watchlist = ranked.filter { it.coin.chain + ":" + it.coin.address !in pickKeys }.take(8)
