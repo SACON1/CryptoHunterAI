@@ -220,27 +220,16 @@ fun MemeCoinRadarScreen() {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("MEME COIN RADAR", color = Color(0xFF45D9FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text("Νέα meme coins", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                Text("MEME COIN RADAR", color = Color(0xFF45D9FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("Κορυφαίες ευκαιρίες", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
             }
             Text(if (loading) "● SCANNING" else "● RADAR", color = if (loading) Color(0xFFFFC857) else Color(0xFF42E6B0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
-        Text("Αυτόματη σάρωση ανά 2 λεπτά • DexScreener • αξιολόγηση agents", color = Color(0xFFA7B4D0), fontSize = 11.sp)
+        Text("Αυτόματη σάρωση • DexScreener • πολλαπλοί agents • τελικός Master Agent", color = Color(0xFFA7B4D0), fontSize = 11.sp)
         Text(agentStatus, color = Color(0xFF45D9FF), fontSize = 10.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { refresh++ }, enabled = !loading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B75FF))) {
-                Text(if (loading) "Σάρωση..." else "↻ Σάρωση τώρα")
-            }
-            scan?.let { Text("Έλεγχος ${it.checkedAt}", color = Color(0xFFA7B4D0), fontSize = 10.sp, modifier = Modifier.padding(top = 12.dp)) }
-        }
-        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF9B75FF))
-        if (error.isNotBlank()) Text("Σφάλμα: $error", color = Color(0xFFFFC857), fontSize = 11.sp)
-        Text("ΠΡΟΣΟΧΗ: Τα boosts είναι πληρωμένες προωθήσεις. Η εμφάνιση εδώ δεν σημαίνει ότι ένα coin είναι legit ή ασφαλές.", color = Color(0xFFFFC857), fontSize = 11.sp)
-        Text("MEME COIN RADAR", color = Color(0xFF45D9FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Text("Κορυφαίες ευκαιρίες μετά από έλεγχο", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Η λίστα εμφανίζει μόνο όσα πέρασαν από τους εξειδικευμένους agents και τον τελικό Master Agent.", color = Color(0xFFA7B4D0), fontSize = 11.sp)
-        Text(agentStatus, color = Color(0xFF45D9FF), fontSize = 10.sp)
-        scan?.let { Text("Πηγή αγοράς: DexScreener • Σάρωση ${it.checkedAt}", color = Color(0xFFA7B4D0), fontSize = 10.sp) }
+        scan?.let { Text("Τελευταίος έλεγχος: ${it.checkedAt}", color = Color(0xFFA7B4D0), fontSize = 10.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { refresh++ }, enabled = !loading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B75FF))) {
                 Text(if (loading) "Σάρωση..." else "↻ Σάρωση τώρα")
@@ -249,9 +238,9 @@ fun MemeCoinRadarScreen() {
         }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF9B75FF))
         if (error.isNotBlank()) Text("Σφάλμα: $error", color = Color(0xFFFFC857), fontSize = 11.sp)
-        Text("Αν δεν περάσει κάποιο coin όλους τους ελέγχους, δεν εμφανίζεται ως ευκαιρία. Αυτό δεν αποτελεί εγγύηση ασφάλειας ή κέρδους.", color = Color(0xFFFFC857), fontSize = 11.sp)
+        Text("ΠΡΟΣΟΧΗ: Τα boosts είναι πληρωμένες προωθήσεις. Οι έλεγχοι μειώνουν κινδύνους αλλά δεν εγγυώνται ότι ένα coin είναι ασφαλές ή κερδοφόρο.", color = Color(0xFFFFC857), fontSize = 11.sp)
         if (!loading && scan != null && masterPicks.isEmpty()) {
-            Text("Δεν βρέθηκε coin που να περνά όλα τα κριτήρια σε αυτή τη σάρωση. Οι απορρίψεις δεν προβάλλονται ως ευκαιρίες.", color = Color.White, fontSize = 13.sp)
+            Text("Δεν βρέθηκε coin που να περνά όλα τα κριτήρια. Καλύτερα καμία επιλογή παρά επικίνδυνη επιλογή.", color = Color.White, fontSize = 13.sp)
         }
         masterPicks.forEachIndexed { index, pick ->
             val coin = pick.coin
