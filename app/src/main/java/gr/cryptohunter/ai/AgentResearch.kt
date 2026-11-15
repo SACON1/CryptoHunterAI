@@ -83,8 +83,16 @@ private suspend fun fetchAgentData():AgentData=withContext(Dispatchers.IO) {
             if(addr.isBlank() || link.isBlank()) null else AgentItem("Προωθημένο token • ${o.optString("chainId")}","DexScreener Boosts",link,"Boost: ${o.optString("amount","—")} • $addr. Η πληρωμένη προώθηση δεν είναι ένδειξη αξιοπιστίας.","BOOST")
         }
     }.getOrDefault(emptyList())
-    val socialFeeds=listOf("https://www.reddit.com/r/CryptoCurrency/.rss","https://www.reddit.com/r/solana/.rss","https://www.reddit.com/r/memecoins/.rss")
-    val social=socialFeeds.flatMapIndexed { i,url -> runCatching { agentRss(agentGet(url),listOf("r/CryptoCurrency","r/solana","r/memecoins")[i],"SOCIAL") }.getOrDefault(emptyList()) }.take(25)
+    val socialFeeds=listOf(
+        "https://www.reddit.com/r/CryptoCurrency/.rss",
+        "https://www.reddit.com/r/solana/.rss",
+        "https://www.reddit.com/r/memecoins/.rss",
+        "https://news.google.com/rss/search?q=crypto+memecoin+OR+meme+coin+site%3Ax.com+OR+site%3Atwitter.com&hl=en-US&gl=US&ceid=US:en"
+    )
+    val social=socialFeeds.flatMapIndexed { i,url ->
+        val source=listOf("r/CryptoCurrency","r/solana","r/memecoins","X / Twitter • δημόσια indexed posts")[i]
+        runCatching { agentRss(agentGet(url),source,"SOCIAL") }.getOrDefault(emptyList())
+    }.take(35)
     val newsFeeds=listOf("https://cointelegraph.com/rss","https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml","https://www.theblock.co/rss.xml")
     val news=newsFeeds.flatMapIndexed { i,url -> runCatching { agentRss(agentGet(url),listOf("Cointelegraph","CoinDesk","The Block")[i],"NEWS") }.getOrDefault(emptyList()) }.take(30)
     val memeCoins=runCatching { scanMemeCoins().coins }.getOrDefault(emptyList())
@@ -221,7 +229,7 @@ fun AgentResearchScreen() {
                 Text(if(loading)"● SCANNING" else if(data!=null)"● CONNECTED" else "● WAITING",color=if(loading)Color(0xFFFFC857) else Color(0xFF42E6B0),fontSize=10.sp,fontWeight=FontWeight.Bold)
             }
             if(loading) LinearProgressIndicator(Modifier.fillMaxWidth(),color=Color(0xFF9B75FF))
-            Text("DexScreener • Reddit RSS • Crypto news RSS",color=Color.White,fontSize=11.sp)
+            Text("DexScreener • Reddit RSS • X/Twitter indexed posts • Crypto news RSS",color=Color.White,fontSize=11.sp)
             Text("Τελευταίος έλεγχος: ${data?.time ?: "—"} • ανανέωση ανά 5 λεπτά όταν είναι ανοιχτή η καρτέλα",color=Color(0xFFA7B4D0),fontSize=9.sp)
             TextButton(onClick={refresh++}) { Text("↻ Σάρωση τώρα",color=Color(0xFF45D9FF)) }
         }
@@ -232,7 +240,7 @@ fun AgentResearchScreen() {
         }
         if(error.isNotBlank()) Text(error,color=Color(0xFFFFC857),fontSize=11.sp)
         if(tab=="MEME") Text("Δωρεάν ανάλυση κανόνων: αντιστοίχιση ονόματος/συμβόλου, θεματικές ειδήσεων, θετικό/αρνητικό λεξιλόγιο και market red flags. Δεν είναι ακόμη μεγάλο γλωσσικό μοντέλο και δεν αποδεικνύει αιτιώδη σχέση.",color=Color(0xFFA7B4D0),fontSize=10.sp)
-        if(tab=="SOCIAL") Text("Δημόσιες συζητήσεις Reddit μέσω RSS. Η ένδειξη κλίματος είναι απλή ανάλυση λέξεων, όχι AI πρόβλεψη.",color=Color(0xFFA7B4D0),fontSize=10.sp)
+        if(tab=="SOCIAL") Text("Δημόσιες συζητήσεις από Reddit RSS και δημόσια posts του X/Twitter που είναι indexed από Google News. Δεν είναι πλήρης live αναζήτηση X· για αυτήν απαιτείται επίσημο X API. Η ένδειξη κλίματος είναι απλή ανάλυση λέξεων, όχι AI πρόβλεψη.",color=Color(0xFFA7B4D0),fontSize=10.sp)
         if(tab=="BOOSTS") Text("Τα boosts είναι πληρωμένη προβολή — όχι απόδειξη ποιότητας ή ασφάλειας.",color=Color(0xFFFFC857),fontSize=10.sp)
         if(tab=="MEME") {
             if(memeList.isEmpty() && !loading) Text("Δεν βρέθηκαν live meme coin pairs από τις πηγές αυτή τη στιγμή.",color=Color(0xFFA7B4D0),fontSize=12.sp)
@@ -284,6 +292,6 @@ fun AgentResearchScreen() {
                 if(item.url.startsWith("https://")) TextButton(onClick={context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(item.url)))}) { Text("Άνοιγμα πηγής ↗",color=Color(0xFF42E6B0),fontSize=10.sp) }
             }
         }
-        Text("Το X δεν έχει συνδεθεί ακόμη: απαιτείται επίσημη πρόσβαση API. Για επίσημη και σταθερή πρόσβαση στο Reddit χρειάζεται εγκεκριμένο OAuth. Η ανάλυση είναι δωρεάν λογική κανόνων — όχι LLM, background cloud agent ή αυτόματη αγορά.",color=Color(0xFFA7B4D0),fontSize=10.sp)
+        Text("Το X/Twitter ελέγχεται μόνο μέσω δημόσιων indexed αποτελεσμάτων, όχι από πλήρες επίσημο live API. Η ανάλυση είναι δωρεάν λογική κανόνων — όχι LLM, background cloud agent ή αυτόματη αγορά.",color=Color(0xFFA7B4D0),fontSize=10.sp)
     }
 }
