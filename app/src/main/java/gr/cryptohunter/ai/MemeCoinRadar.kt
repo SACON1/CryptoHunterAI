@@ -126,6 +126,8 @@ fun MemeCoinRadarScreen() {
     var agentStatus by remember { mutableStateOf("Οι agents περιμένουν την πρώτη σάρωση.") }
     var evaluatedCount by remember { mutableIntStateOf(0) }
     var rejectedCount by remember { mutableIntStateOf(0) }
+    var agentErrorCount by remember { mutableIntStateOf(0) }
+    var agentErrorDetails by remember { mutableStateOf<List<String>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -148,6 +150,8 @@ fun MemeCoinRadarScreen() {
         agentScores = emptyMap()
         evaluatedCount = 0
         rejectedCount = 0
+        agentErrorCount = 0
+        agentErrorDetails = emptyList()
         agentStatus = "1/4: Οι εξειδικευμένοι agents ελέγχουν υποψηφιότητες..."
         val evaluated = mutableListOf<Pair<MemeCandidate, MemeCouncilReport>>()
         val candidates = current.coins
@@ -160,7 +164,11 @@ fun MemeCoinRadarScreen() {
                 val report = runMemeAgentCouncil(coin)
                 evaluated += coin to report
                 agentScores = agentScores + ((coin.chain + ":" + coin.address) to report.score)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                agentErrorCount++
+                if (agentErrorDetails.size < 3) {
+                    agentErrorDetails = agentErrorDetails + "${coin.symbol}: ${e.message ?: "άγνωστο σφάλμα"}"
+                }
                 // Failed evaluation is excluded; it is never treated as a clean token.
             }
         }
@@ -180,7 +188,7 @@ fun MemeCoinRadarScreen() {
                 prefs.edit().putLong(key, System.currentTimeMillis()).apply()
             }
         }
-        agentStatus = "Master Agent: ${master.picks.size} επιλεγμένα από ${master.evaluated} ελεγμένα • ${master.rejected} απορρίφθηκαν."
+        agentStatus = "Master Agent: ${master.picks.size} επιλεγμένα • ${master.evaluated} αξιολογήθηκαν • ${master.rejected} απορρίφθηκαν • ${agentErrorCount} σφάλματα agent."
     }
 
     if (selected != null) {
@@ -237,7 +245,12 @@ fun MemeCoinRadarScreen() {
             if (loading) Text("Οι agents εργάζονται...", color = Color(0xFFFFC857), modifier = Modifier.padding(top = 12.dp), fontSize = 10.sp)
         }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF9B75FF))
-        if (error.isNotBlank()) Text("Σφάλμα: $error", color = Color(0xFFFFC857), fontSize = 11.sp)
+        if (error.isNotBlank()) Text("Σφάλμα σάρωσης: $error", color = Color(0xFFFFC857), fontSize = 11.sp)
+        if (scan != null) Text("Βρέθηκαν ${scan!!.coins.size} υποψήφια tokens από ${scan!!.sources} διευθύνσεις πηγών.", color = Color(0xFFA7B4D0), fontSize = 10.sp)
+        if (agentErrorDetails.isNotEmpty()) {
+            Text("Λεπτομέρειες αποτυχημένων ελέγχων:", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            agentErrorDetails.forEach { Text("• $it", color = Color(0xFFFFC857), fontSize = 10.sp) }
+        }
         Text("ΠΡΟΣΟΧΗ: Τα boosts είναι πληρωμένες προωθήσεις. Οι έλεγχοι μειώνουν κινδύνους αλλά δεν εγγυώνται ότι ένα coin είναι ασφαλές ή κερδοφόρο.", color = Color(0xFFFFC857), fontSize = 11.sp)
         if (!loading && scan != null && masterPicks.isEmpty()) {
             Text("Δεν βρέθηκε coin που να περνά όλα τα κριτήρια. Καλύτερα καμία επιλογή παρά επικίνδυνη επιλογή.", color = Color.White, fontSize = 13.sp)
