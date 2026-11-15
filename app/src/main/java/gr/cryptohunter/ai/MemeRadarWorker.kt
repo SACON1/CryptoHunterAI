@@ -21,13 +21,24 @@ class MemeRadarWorker(context: Context, params: WorkerParameters) : CoroutineWor
             SignalNotifications.createChannel(applicationContext)
             val scan = scanMemeCoins()
             val prefs = applicationContext.getSharedPreferences("meme_radar_alerts", Context.MODE_PRIVATE)
-            for (coin in scan.coins.take(8)) {
-                val report = runMemeAgentCouncil(coin)
-                if (report.blocked || report.score < 75) continue
+            val evaluated = mutableListOf<Pair<MemeCandidate, MemeCouncilReport>>()
+            val candidates = scan.coins
+                .sortedWith(compareByDescending<MemeCandidate> { it.liquidity }.thenByDescending { it.volume24h })
+                .take(12)
+            for (coin in candidates) {
+                try {
+                    evaluated += coin to runMemeAgentCouncil(coin)
+                } catch (_: Exception) {
+                    // Failed checks are excluded, never considered safe.
+                }
+            }
+            val master = MemeMasterAgent.select(evaluated)
+            for (pick in master.picks) {
+                val coin = pick.coin
                 val key = "${coin.chain}:${coin.address}"
                 val last = prefs.getLong(key, 0L)
                 if (System.currentTimeMillis() - last < 12 * 60 * 60 * 1000L) continue
-                MemeRadarAlerts.notify(applicationContext, coin, report.score, report.verdict)
+                MemeRadarAlerts.notify(applicationContext, coin, pick.report.score, pick.report.verdict)
                 prefs.edit().putLong(key, System.currentTimeMillis()).apply()
             }
             Result.success()
