@@ -55,7 +55,11 @@ internal object MemeNewsSocialAgent {
                 }
             }
 
-            val unique = found.distinctBy { it.url.ifBlank { it.title } }.take(8)
+            val unique = found.distinctBy { it.url.ifBlank { it.source + it.title } }
+                .groupBy { it.source }
+                .values
+                .flatMap { sourceItems -> sourceItems.take(4) }
+                .take(12)
             val positives = listOf(
                 "partnership", "partner", "listing", "listed", "launch", "integration",
                 "adoption", "investment", "funding", "support", "airdrop", "collaboration",
