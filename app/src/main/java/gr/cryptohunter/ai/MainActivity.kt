@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.*
@@ -178,7 +179,7 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
                 androidx.compose.foundation.Image(
                     painter = painterResource(id = R.drawable.ic_crypto_hunter),
                     contentDescription = "Crypto Hunter AI",
-                    modifier = Modifier.size(52.dp),
+                    modifier = Modifier.size(62.dp).graphicsLayer { scaleX = 0.98f + liveAlpha * 0.035f; scaleY = 0.98f + liveAlpha * 0.035f },
                     contentScale = ContentScale.Crop
                 )
                 Spacer(Modifier.width(12.dp))
@@ -193,14 +194,23 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(Modifier.height(22.dp))
-            Text("Η αγορά, με", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.Bold)
-            Text("άλλη ματιά.", color = Violet, fontSize = 29.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Text("Spot  •  Futures  •  Multi-exchange", color = Muted, fontSize = 13.sp)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
+            GlassCard(accent = Violet) {
+                Text("AI MARKET INTELLIGENCE", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.height(8.dp))
+                Text("Η αγορά, με", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                Text("άλλη ματιά.", color = Violet, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.height(8.dp))
+                Text("Spot  •  Futures  •  Meme Coins  •  Multi-agent research", color = Muted, fontSize = 11.sp)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Box(Modifier.size(7.dp).background(Green.copy(alpha = liveAlpha), RoundedCornerShape(50)))
+                    Text(if (connection.startsWith("Επιτυχής")) "RADAR ΣΕ ΛΕΙΤΟΥΡΓΙΑ" else "ΣΥΝΔΕΣΗ ΣΕ ΕΛΕΓΧΟ", color = if (connection.startsWith("Επιτυχής")) Green else Color(0xFFFFC857), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(18.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Επισκόπηση", "Σήματα", "Meme Coins", "Rug Pull", "Agent", "Ρυθμίσεις").forEach { item ->
+                listOf("Επισκόπηση", "Σήματα", "Meme Coins", "Agent", "Ρυθμίσεις").forEach { item ->
                     GlassChip(label = item, selected = tab == item) { tab = item }
                 }
             }
@@ -249,9 +259,6 @@ fun CryptoHunterApp(notificationSymbol: String? = null, onNotificationHandled: (
                 }
                 "Meme Coins" -> {
                     MemeCoinRadarScreen()
-                }
-                "Rug Pull" -> {
-                    RugPullHunterScreen()
                 }
                 "Agent" -> {
                     AgentResearchScreen()
