@@ -40,8 +40,10 @@ internal object MemeNewsSocialAgent {
             val found = mutableListOf<NewsSocialItem>()
             var checked = 0
 
+            val xQuery = URLEncoder.encode("$query site:x.com OR site:twitter.com", "UTF-8")
             val feeds = listOf(
                 "Google News" to "https://news.google.com/rss/search?q=$encoded&hl=en-US&gl=US&ceid=US:en",
+                "X / Twitter (δημόσια indexed posts)" to "https://news.google.com/rss/search?q=$xQuery&hl=en-US&gl=US&ceid=US:en",
                 "Reddit" to "https://www.reddit.com/search.rss?q=$encoded&sort=new&t=week"
             )
             for ((source, url) in feeds) {
@@ -77,7 +79,7 @@ internal object MemeNewsSocialAgent {
             val note = when {
                 checked == 0 -> "Οι δημόσιες πηγές ειδήσεων/social δεν ήταν διαθέσιμες αυτή τη φορά."
                 unique.isEmpty() -> "Δεν βρέθηκαν σχετικές αναφορές. Η απουσία αποτελεσμάτων δεν σημαίνει ότι το token είναι ασφαλές."
-                else -> "Βρέθηκαν ${unique.size} αναφορές από Google News και Reddit. Το sentiment βασίζεται σε λέξεις-κλειδιά, όχι σε επιβεβαίωση γεγονότων."
+                else -> "Βρέθηκαν ${unique.size} αναφορές από Google News, δημόσια indexed posts του X/Twitter και Reddit. Το X δεν παρέχει πλήρη ζωντανή αναζήτηση μέσω αυτής της δωρεάν μεθόδου. Το sentiment βασίζεται σε λέξεις-κλειδιά, όχι σε επιβεβαίωση γεγονότων."
             }
             val result = NewsSocialPulse(score, positiveHits, negativeHits, unique, checked, note)
             synchronized(cache) { cache[key] = Cached(System.currentTimeMillis(), result) }
